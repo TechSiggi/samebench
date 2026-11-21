@@ -157,7 +157,8 @@ commit and push right after the fix, and all other machines pick it up with `sam
 
 On every other machine a fix is applied **locally only**, as an emergency measure. `samebench doctor` shows that the
 machine deviates. As soon as the repository contains the fix, `samebench sync` switches back to the repository's version.
-Until then the local fix stays active.
+Until then the local fix stays active. Should it no longer fit the lockfiles of a new state, `samebench sync` drops
+it, says so and stops, and the next check offers the fix again.
 
 ```mermaid
 sequenceDiagram

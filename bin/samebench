@@ -28,7 +28,9 @@ MISE_SHA256_linux_arm64="146b114c2714f6ed76a629778f162d578e14821e47b87389dbdd640
 SAMEBENCH_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
-STATE_DIR="$CONFIG_HOME/samebench"
+# Always ~/.config/samebench: the line in the shell startup files, tmux.conf and the docs name
+# this path, so local.sh and allowed_signers must not be looked up anywhere else.
+STATE_DIR="$HOME/.config/samebench"
 DATA_DIR="$DATA_HOME/samebench"
 JUPYTER_VENV="$DATA_DIR/jupyter-venv"
 KERNEL_REQS="$DATA_DIR/kernel-requirements.txt"
@@ -959,7 +961,7 @@ EOF
 }
 
 cmd_sync() {
-  local yes="" behind signers c stashed="" all_in=1 kind pkg ver
+  local yes="" behind signers c stashed="" all_in=1 kind pkg ver patches
   [ "${1:-}" = "-y" ] && yes=1
   load_profile ""
   say "Fetching the repository's latest state"
@@ -998,9 +1000,17 @@ cmd_sync() {
         git -C "$SAMEBENCH_REPO" stash drop -q
         rm -f "$STATE_DIR/local-patches"
         ok "The repository now contains your local security patches, switched back to its state."
-      else
-        git -C "$SAMEBENCH_REPO" stash pop -q || warn "The local patches could not be applied again, please check 'git -C $SAMEBENCH_REPO stash list'."
+      elif git -C "$SAMEBENCH_REPO" stash pop -q >/dev/null 2>&1; then
         warn "The repository doesn't contain all local security patches yet, they stay active."
+      else
+        # The patches no longer fit the new lockfiles and left conflict markers in them.
+        # Nothing may install from that, so the repository's state comes back and the run ends.
+        # shellcheck disable=SC2086
+        git -C "$SAMEBENCH_REPO" checkout -q HEAD -- $LOCKFILES
+        git -C "$SAMEBENCH_REPO" stash drop -q
+        patches="$(paste -sd ' ' "$STATE_DIR/local-patches")"
+        rm -f "$STATE_DIR/local-patches" "$CACHE_DIR/check.stamp"
+        die "The local security patches no longer fit the new lockfiles and were dropped ($patches). Nothing was installed yet. Run 'samebench sync' again, then 'samebench check' offers the fixes again."
       fi
     fi
   else

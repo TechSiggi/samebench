@@ -84,6 +84,10 @@ that second part only runs inside `dev` sessions, which is how other shells stay
 | `~/.local/state/mise/`, `~/.cache/mise/`, on macOS also `~/Library/Caches/mise/` | state and cached downloads of mise |
 | `~/.cache/samebench/` | the result of the daily check |
 
+The settings folder is always `~/.config/samebench`, also when `XDG_CONFIG_HOME` points somewhere else, because
+the line in `.zshrc` and `.bashrc` and the tmux configuration name that path. The links for mise and Neovim follow
+`XDG_CONFIG_HOME`, as those programs do.
+
 Neovim runs with `NVIM_APPNAME=samebench-nvim`, which gives it its own configuration, data and cache folders. tmux runs as
 `tmux -L samebench -f config/tmux/tmux.conf`, a separate server that never reads `~/.tmux.conf`.
 
@@ -157,5 +161,7 @@ the characters `.`, `+`, `_` and `-`.
 `samebench sync` fetches, lists the incoming commits, verifies their SSH signatures against
 `~/.config/samebench/allowed_signers` when that file exists, and asks before it merges. Local security patches are put
 aside with `git stash`, and the stash is dropped once the repository contains the same or a newer version.
-Otherwise the patches are applied again. The final `samebench apply` is started as a new process, so the scripts that
+Otherwise the patches are applied again. When they no longer fit the new lockfiles, `samebench sync` restores the
+repository's state, drops the patches, names them and stops before anything is installed. The next check offers
+the fixes again. The final `samebench apply` is started as a new process, so the scripts that
 were just fetched do the work, and a mise version they pin is installed on the way.
