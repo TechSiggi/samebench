@@ -55,8 +55,13 @@ the top of `bin/samebench`, and only then copies the binary into place. A mismat
 mise that was there before `samebench` ever set up this machine is moved to `mise.backup-<date>` first, and `samebench remove`
 puts it back when you let it delete the installed programs as well.
 
-The plugin step has a safeguard of its own. lazy.nvim writes `lazy-lock.json` again after every install, from the
-plugins it finds installed. A run that fails halfway would drop pins that way, and the next run would fetch the
+On a new machine the Neovim configuration fetches lazy.nvim and LazyVim itself first, each at its locked commit,
+before lazy.nvim starts. LazyVim names most of the plugins. Without it lazy.nvim would install in two rounds, forget
+the locked commits of the second round and install those plugins at their newest commit. With LazyVim in place one
+round installs every plugin at its locked commit.
+
+The plugin step has a safeguard of its own on top of that. lazy.nvim writes `lazy-lock.json` again after every
+install, from the plugins it finds installed. A run that fails halfway would drop pins that way, and the next run would fetch the
 newest commits instead. `samebench apply` therefore keeps the pinned list aside before it starts Neovim and puts it
 back when lazy.nvim changed it. At the end it compares the checkout of every plugin with its locked commit and
 stops when one is missing or differs.
