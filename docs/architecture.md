@@ -53,7 +53,8 @@ The mise step does nothing when exactly the pinned version already sits in `~/.l
 the release archive over HTTPS into a temporary folder, compares its SHA-256 with the sum for this platform from
 the top of `bin/samebench`, and only then copies the binary into place. A mismatch ends `samebench` with nothing installed. A
 mise that was there before `samebench` ever set up this machine is moved to `mise.backup-<date>` first, and `samebench remove`
-puts it back when you let it delete the installed programs as well.
+puts it back when you let it delete the installed programs as well. In that case the data and cache folders of mise
+stay, since the earlier mise keeps its tools in the same place.
 
 On a new machine the Neovim configuration fetches lazy.nvim and LazyVim itself first, each at its locked commit,
 before lazy.nvim starts. LazyVim names most of the plugins. Without it lazy.nvim would install in two rounds, forget

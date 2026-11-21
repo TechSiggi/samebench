@@ -86,15 +86,23 @@ all_modules() { (cd "$SAMEBENCH_REPO/modules" && ls); }
 # --------------------------------------------------------------- Helpers ---
 newest_backup() { ls -dt "$1".backup-* 2>/dev/null | head -1; }
 
-# link <source> <target>: create a symlink; existing foreign files are backed up first.
+# own_link <source> <target>: is <target> a link samebench created? That includes one from an
+# earlier repository folder (after a rename or move), recognisable by the same path inside it.
+own_link() {
+  local inside="${1#"$SAMEBENCH_REPO"}"
+  [ -L "$2" ] || return 1
+  case "$(readlink "$2")" in *"$inside") return 0 ;; esac
+  return 1
+}
+
+# link <source> <target>: create a symlink; existing foreign files and links are backed up first.
 link() {
-  local src="$1" dst="$2"
+  local src="$1" dst="$2" backup
   mkdir -p "$(dirname "$dst")"
-  if [ -L "$dst" ]; then
-    [ "$(readlink "$dst")" = "$src" ] && return 0
+  if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then return 0; fi
+  if own_link "$src" "$dst"; then
     rm "$dst"
-  elif [ -e "$dst" ]; then
-    local backup
+  elif [ -e "$dst" ] || [ -L "$dst" ]; then
     backup="$dst.backup-$(date +%Y%m%d-%H%M%S)"
     warn "$dst already exists, backed up as $backup"
     mv "$dst" "$backup"
@@ -248,7 +256,7 @@ link_mise_modules() { # link_mise_modules <module...>
     case "$(readlink "$f")" in "$SAMEBENCH_REPO"/* | */modules/*/tools.toml) rm "$f" ;; esac
   done
   for m in "$@"; do
-    [ -f "$SAMEBENCH_REPO/modules/$m/tools.toml" ] && ln -s "$SAMEBENCH_REPO/modules/$m/tools.toml" "$confd/$m.toml"
+    [ -f "$SAMEBENCH_REPO/modules/$m/tools.toml" ] && link "$SAMEBENCH_REPO/modules/$m/tools.toml" "$confd/$m.toml"
   done
   return 0
 }
@@ -574,8 +582,8 @@ plan_tools() {
 link_status() {
   local src="$1" dst="$2"
   if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then echo "ok|already set up"
-  elif [ -L "$dst" ]; then echo "~|link will be replaced (points to $(readlink "$dst") today)"
-  elif [ -e "$dst" ]; then echo "!|exists, will be backed up (.backup-<date>) and replaced"
+  elif own_link "$src" "$dst"; then echo "~|link will be replaced (points to $(readlink "$dst") today)"
+  elif [ -e "$dst" ] || [ -L "$dst" ]; then echo "!|exists, will be backed up (.backup-<date>) and replaced"
   else echo "+|new (link into the repository)"; fi
 }
 
@@ -1038,10 +1046,12 @@ cmd_doctor() {
 
 # Programs, data and caches that stay when only the setup is removed, one path per line.
 # mise keeps its cache in ~/Library/Caches on macOS and in the cache folder elsewhere.
+# A mise that was here before samebench uses the same folders, so they are left out then.
 leftover_list() {
   local state="${XDG_STATE_HOME:-$HOME/.local/state}" cache="${XDG_CACHE_HOME:-$HOME/.cache}"
-  printf '%s\n' "$DATA_DIR" "$CACHE_DIR" "$DATA_HOME/$NVIM_APP" "$state/$NVIM_APP" "$cache/$NVIM_APP" \
-    "$DATA_HOME/mise" "$state/mise" "$cache/mise" "$HOME/Library/Caches/mise" "$MISE_BIN"
+  printf '%s\n' "$DATA_DIR" "$CACHE_DIR" "$DATA_HOME/$NVIM_APP" "$state/$NVIM_APP" "$cache/$NVIM_APP" "$MISE_BIN"
+  [ -n "$(newest_backup "$MISE_BIN")" ] ||
+    printf '%s\n' "$DATA_HOME/mise" "$state/mise" "$cache/mise" "$HOME/Library/Caches/mise"
 }
 
 # The way back: remove everything samebench set up
@@ -1052,7 +1062,7 @@ cmd_remove() {
   echo "   · the line for samebench in ~/.zshrc and ~/.bashrc"
   echo "   · git: include.path, '*.ipynb diff=samebench-ipynb', '.*.nb.py' (global config)"
   echo "   · links: ~/.config/$NVIM_APP, ~/.config/mise/{config.toml,mise.lock,conf.d/*}, backups (.backup-*) come back"
-  echo "   · ~/.config/samebench (except local.sh) and running dev sessions (tmux -L samebench)"
+  echo "   · ~/.config/samebench (except local.sh and allowed_signers) and running dev sessions (tmux -L samebench)"
   echo "   Programs, data and caches (mise, plugins, Jupyter) are asked about separately afterwards."
   if [ -z "$yes" ]; then ask "Remove it now?" || die "Cancelled, nothing changed."; fi
   remove_line "$RC_LINE" "$HOME/.zshrc"
@@ -1069,13 +1079,13 @@ cmd_remove() {
 $(link_list)
 EOF
   for f in "$CONFIG_HOME/mise/conf.d"/*.toml; do
-    [ -L "$f" ] && case "$(readlink "$f")" in "$SAMEBENCH_REPO"/*) rm "$f" ;; esac
+    unlink_own "$f" "$SAMEBENCH_REPO/*" || true
   done
   # the mise folders go only when nothing else is left in them
   rmdir "$CONFIG_HOME/mise/conf.d" "$CONFIG_HOME/mise" 2>/dev/null || true
   command -v tmux >/dev/null 2>&1 && tmux -L samebench kill-server 2>/dev/null || true
   if [ -d "$STATE_DIR" ]; then
-    find "$STATE_DIR" -mindepth 1 -maxdepth 1 ! -name local.sh -exec rm -rf {} +
+    find "$STATE_DIR" -mindepth 1 -maxdepth 1 ! -name local.sh ! -name allowed_signers -exec rm -rf {} +
     rmdir "$STATE_DIR" 2>/dev/null || true
   fi
   ok "Setup removed. Open a new shell."
@@ -1086,6 +1096,9 @@ EOF
   done <<EOF
 $(leftover_list)
 EOF
+  if [ -n "$(newest_backup "$MISE_BIN")" ]; then
+    echo "     (the folders of mise also hold the tools of the mise you had before, they stay)"
+  fi
   echo "     (Python versions and the package cache of uv live in ~/.local/share/uv and ~/.cache/uv,"
   echo "      they belong to uv and stay)"
   for f in "${XDG_CACHE_HOME:-$HOME/.cache}/tree-sitter" "${XDG_CACHE_HOME:-$HOME/.cache}/ty" \

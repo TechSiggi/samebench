@@ -144,7 +144,7 @@ belong to someone else without keeping a copy.
 | `~/.config/uv/uv.toml` with your own uv settings | Stays unchanged |
 | uv, Jupyter or Python from Homebrew, pip or apt | Stay installed, and `samebench plan` lists them |
 | A mise of another version in `~/.local/bin` | Is kept as `mise.backup-<date>` with a warning, and the pinned version takes its place |
-| `~/.config/mise/config.toml` | Is kept as a backup copy and replaced by a link into the repository |
+| `~/.config/mise/config.toml`, as a file or as a link of your own | Is kept as `config.toml.backup-<date>` and replaced by a link into the repository |
 | `.zshrc`, `.bashrc`, global git config | Get one addition each, nothing is replaced |
 
 On a machine where other tools should behave exactly as before, set the activation to `dev`. Then the tools
@@ -186,8 +186,9 @@ samebench remove
 
 This removes the line in `.zshrc` and `.bashrc`, the additions to your global git config, all links (backups come
 back) and running `dev` sessions. Afterwards it asks separately whether the installed programs, their data and the
-caches should go too. If you say yes and `samebench` had put a mise of yours aside, that one comes back. Your
-`local.sh` stays. Python versions installed by uv and its package cache live in `~/.local/share/uv` and
+caches should go too. If you say yes and `samebench` had put a mise of yours aside, that one comes back, and the
+folders of mise stay because they hold its tools as well. Your `local.sh` and your `allowed_signers` stay. Python
+versions installed by uv and its package cache live in `~/.local/share/uv` and
 `~/.cache/uv`. They belong to uv, so they stay as well. A few small caches can stay too, from tree-sitter, from ty
 and from the signature check in mise, because other programs may share them. `samebench remove` names them when they
 exist.
