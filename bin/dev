@@ -1,0 +1,245 @@
+#!/usr/bin/env bash
+# dev - start the workspace in tmux (or go back to it)
+#
+#   dev [-l layout] [-j] [-r] [folder] [name]
+#   dev -s             list running sessions
+#   dev -k [folder]    stop a session (agent, kernel and JupyterLab in it)
+#
+#   -l layout  choose the layout (otherwise the profile's, default: code)
+#   -j         add Jupyter: project packages via uv (asks once per uv.lock), a kernel
+#              from the project's .venv and JupyterLab in the "jupyter" window
+#   -r         stop the running session and rebuild it (other layout, -j)
+#
+# Layouts:
+#   code   Neovim on top, terminal bottom left, agent bottom right   (default)
+#   agent  agent on the left (30 %), Neovim on the right for reviewing
+#
+# Every workspace is a tmux session (named after its folder) on a separate
+# tmux server ("tmux -L samebench", configuration from this repository, your own
+# tmux stays untouched). If it is already running it is simply reopened, so
+# the kernel and the agent keep running, even when an SSH connection drops.
+set -euo pipefail
+
+SAMEBENCH_REPO="${SAMEBENCH_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)}"
+# shellcheck source=../libexec/common.sh
+. "$SAMEBENCH_REPO/libexec/common.sh"
+usage() { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; }
+samebench() { "$SAMEBENCH_REPO/bin/samebench" "$@"; }
+
+layout="${SAMEBENCH_LAYOUT:-code}"
+layout_given=""
+jupyter=""
+restart=""
+action=""
+while getopts "l:jrskh" opt; do
+  case "$opt" in
+    l) layout="$OPTARG"; layout_given=1 ;;
+    j) jupyter=1 ;;
+    r) restart=1 ;;
+    s) action=list ;;
+    k) action=kill ;;
+    h) usage; exit 0 ;;
+    *) usage; exit 1 ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+case "$layout" in
+  code | agent) ;;
+  *) warn "Unknown layout: $layout"; usage; exit 1 ;;
+esac
+
+dir="$(cd "${1:-.}" && pwd -P)"
+name="${2:-$(basename "$dir")}"
+name="$(printf '%s' "$name" | tr -c 'A-Za-z0-9_-' '_')"
+# Programs that came with a clone never run: a .venv with files tracked by git is not used
+venv_tracked() { [ -n "$(git -C "$dir" ls-files .venv 2>/dev/null | head -1)" ]; }
+
+# Always use the tools from mise (tmux, nvim, uv), even when the shell hasn't
+# activated them (activation "dev") or another uv or tmux comes first.
+export PATH="$HOME/.local/bin:$PATH"
+if command -v mise >/dev/null 2>&1; then eval "$(cd "$HOME" && mise env -s bash)"; fi
+command -v tmux >/dev/null 2>&1 || die "tmux is missing, run 'samebench apply'."
+export NVIM_APPNAME="samebench-nvim" SAMEBENCH_REPO
+export UV_PYTHON_DOWNLOADS="${SAMEBENCH_UV_PYTHON_DOWNLOADS:-manual}"
+
+# Separate tmux server with the configuration from the repository (-f only applies when the server starts)
+SOCK="${SAMEBENCH_TMUX_SOCKET:-samebench}"
+tmux() { command tmux -L "$SOCK" -f "$SAMEBENCH_REPO/config/tmux/tmux.conf" "$@"; }
+
+attach() {
+  # Already inside a dev session (same server): just switch
+  if [ -n "${TMUX:-}" ] && [ "$(basename "${TMUX%%,*}")" = "$SOCK" ]; then
+    exec command tmux -L "$SOCK" switch-client -t "=$name"
+  fi
+  # otherwise attach (nested when called from another tmux)
+  TMUX="" exec command tmux -L "$SOCK" attach-session -t "=$name"
+}
+
+case "$action" in
+  list) tmux list-sessions -F '#{session_name}  #{@samebench_layout}  (#{session_windows} windows)#{?session_attached, · attached,}' 2>/dev/null || echo "No dev sessions."; exit 0 ;;
+  kill)
+    tmux has-session -t "=$name" 2>/dev/null || die "No session \"$name\"."
+    tmux kill-session -t "=$name"
+    echo "Session \"$name\" stopped."
+    exit 0
+    ;;
+esac
+
+# At most once a day: security advisories (OSV.dev) and a newer repository state.
+# Only asks for high or critical findings or a new state, otherwise one line.
+samebench daily "$dir" || true
+
+want="$layout${jupyter:+ +jupyter}"
+if tmux has-session -t "=$name" 2>/dev/null; then
+  if [ -n "$restart" ]; then
+    tmux kill-session -t "=$name"
+  else
+    running="$(tmux show-options -qv -t "=$name:" @samebench_layout 2>/dev/null || true)"
+    if { [ -n "$layout_given" ] || [ -n "$jupyter" ]; } && [ "$running" != "$want" ]; then
+      echo "The session \"$name\" is already running as \"${running:-unknown}\"."
+      echo "Rebuild it as \"$want\" (stops the agent and kernel in it):"
+      echo
+      echo "  dev -r${layout_given:+ -l $layout}${jupyter:+ -j}${1:+ $1}"
+      exit 1
+    fi
+    attach
+  fi
+fi
+
+# --------------------------------------------------------------- Jupyter ---
+kernel_path=""
+if [ -n "$jupyter" ]; then
+  [ "${SAMEBENCH_JUPYTER:-ondemand}" != no ] || die "Jupyter is turned off in this profile (JUPYTER=\"no\")."
+  ! venv_tracked || die "This repository tracks files in .venv. Remove that folder first, a kernel never runs from it."
+  venv_tool="${SAMEBENCH_JUPYTER_VENV:-${XDG_DATA_HOME:-$HOME/.local/share}/samebench/jupyter-venv}"
+  # 1) The Jupyter tool (once, after asking)
+  [ -x "$venv_tool/bin/jupyter" ] || samebench jupyter || exit 1
+  # 2) Project packages, exactly as in the project's uv.lock. The repository stays unchanged.
+  if [ -f "$dir/uv.lock" ]; then
+    # Building packages can run their code and a lockfile can point anywhere, so each
+    # version of a uv.lock is approved once (a changed lockfile asks again).
+    approved="${XDG_DATA_HOME:-$HOME/.local/share}/samebench/approved-locks"
+    lock_hash="$(short_hash 64 <"$dir/uv.lock")"
+    if ! grep -qxF "$lock_hash" "$approved" 2>/dev/null; then
+      # "<count>|<name> (<source>), ...": the count leaves out the project itself, the list names
+      # what is not from PyPI. The file belongs to the repository, so only printable ASCII is shown.
+      summary="$(awk '
+        /^\[/ { pkg = ($0 == "[[package]]"); if (pkg) n++ }
+        pkg && /^name = / { name = $0; sub(/^name = "/, "", name); sub(/"$/, "", name) }
+        pkg && /^source = / {
+          s = $0; sub(/^source = \{ */, "", s); sub(/ *\}$/, "", s)
+          if (s ~ /^(virtual|editable) = "\."$/) n--
+          else if (s != "registry = \"https://pypi.org/simple\"") {
+            sub(/ = "/, " ", s); sub(/"$/, "", s)
+            other = other sep name " (" s ")"; sep = ", "
+          }
+        }
+        END { printf "%d|%s", n, other }' "$dir/uv.lock" | LC_ALL=C tr -cd ' -~')"
+      warn "This project wants ${summary%%|*} packages in its .venv (uv sync --frozen, hashes from its uv.lock)."
+      if [ -n "${summary#*|}" ]; then printf '    Not from PyPI: %s\n' "${summary#*|}" >&2; else printf '    All of them come from PyPI.\n' >&2; fi
+      printf '    Building a package can run code from it.\n' >&2
+      ask "Install them?" || die "Cancelled, nothing was installed."
+      mkdir -p "${approved%/*}" && printf '%s\n' "$lock_hash" >>"$approved"
+    fi
+    if ! (cd "$dir" && uv python find >/dev/null 2>&1); then
+      req="$(sed -n 's/^requires-python *= *"\(.*\)"/\1/p' "$dir/pyproject.toml" 2>/dev/null | head -1)"
+      warn "The project needs Python ${req:-(see pyproject.toml)}, which is missing here."
+      echo "   uv can install it (python-build-standalone by Astral, checksum stored in uv)." >&2
+      ask "Install it with uv?" || die "Cancelled, the project kernel needs a matching Python."
+      (cd "$dir" && UV_PYTHON_DOWNLOADS=automatic uv sync --frozen)
+    else
+      say "Project packages from uv.lock (uv sync --frozen)"
+      (cd "$dir" && uv sync --frozen)
+    fi
+  elif [ ! -x "$dir/.venv/bin/python" ]; then
+    if [ -f "$dir/pyproject.toml" ]; then
+      warn "Project without uv.lock: packages are not installed automatically. Review it, then: uv sync  and  dev -r -j"
+    elif [ -f "$dir/requirements.txt" ]; then
+      warn "Project with requirements.txt: review it, then: uv venv && uv pip install -r requirements.txt  and  dev -r -j"
+    else
+      warn "No .venv in the project, the kernel only has the basic Jupyter packages."
+    fi
+  fi
+  # 3) Kernel "python3" = the Python of the project's .venv (this session only)
+  kernel_path="$(samebench kernel "$dir")" || exit 1
+fi
+
+# Agent command (from the profile). If it is missing, the pane shows a hint and a shell.
+agent_cmd="${SAMEBENCH_AGENT_CMD:-}"
+agent_hint=""
+if [ -n "$agent_cmd" ] && ! command -v "$agent_cmd" >/dev/null 2>&1; then
+  agent_hint="Agent \"$agent_cmd\" is not installed (see the docs)."
+  agent_cmd=""
+fi
+
+# Use the size of the current terminal so the percentages are right
+size=()
+if cols="$(tput cols 2>/dev/null)" && lines="$(tput lines 2>/dev/null)"; then
+  size=(-x "$cols" -y "$lines")
+fi
+
+# The project environment (.venv) is active in the whole session: Neovim (ruff, ty), agent, shell.
+# SAMEBENCH_SESSION=1 makes env.sh load the full environment here (also with activation "dev").
+envargs=(-e "SAMEBENCH_REPO=$SAMEBENCH_REPO" -e "SAMEBENCH_SESSION=1" -e "NVIM_APPNAME=samebench-nvim")
+if venv_tracked; then
+  warn "This repository tracks files in .venv, so that folder is not activated."
+elif [ -x "$dir/.venv/bin/python" ]; then
+  envargs+=(-e "VIRTUAL_ENV=$dir/.venv" -e "PATH=$dir/.venv/bin:$PATH")
+fi
+[ -n "$kernel_path" ] && envargs+=(-e "JUPYTER_PATH=$kernel_path")
+
+run() { # run <pane> <command>: start a command in the pane's shell
+  [ -n "$2" ] && tmux send-keys -t "$1" "$2" Enter
+  return 0
+}
+title() { tmux select-pane -t "$1" -T "$2"; }
+# hint <pane> <text>: show a hint, then a normal shell (without typed commands)
+hint() {
+  tmux respawn-pane -k -t "$1" -c "$dir" "printf '\\n  %s\\n\\n' $(printf '%q' "$2"); exec $(printf '%q' "${SHELL:-/bin/zsh}") -l"
+}
+start_agent() { if [ -n "$agent_hint" ]; then hint "$1" "$agent_hint"; else run "$1" "$agent_cmd"; fi; }
+
+tmux new-session -d -s "$name" -c "$dir" -n main ${size[@]+"${size[@]}"} "${envargs[@]}"
+first="$(tmux display-message -p -t "=$name:main" '#{pane_id}')"
+tmux set-option -t "=$name:" @samebench_layout "$want"
+
+case "$layout" in
+  code)
+    editor="$first"
+    term="$(tmux split-window -v -l 30% -t "$editor" -c "$dir" -P -F '#{pane_id}')"
+    agent="$(tmux split-window -h -l 50% -t "$term" -c "$dir" -P -F '#{pane_id}')"
+    title "$editor" "code"; title "$term" "term"; title "$agent" "agent"
+    # Neovim sends notebook cells to this pane (Space jk, see lua/samebench/notebook.lua)
+    tmux set-option -w -t "$editor" @samebench_repl "$term"
+    run "$editor" "nvim"
+    start_agent "$agent"
+    focus="$editor"
+    ;;
+  agent)
+    agent="$first"
+    editor="$(tmux split-window -h -l 70% -t "$agent" -c "$dir" -P -F '#{pane_id}')"
+    title "$agent" "agent"; title "$editor" "code"
+    start_agent "$agent"
+    run "$editor" "nvim"
+    focus="$agent"
+    ;;
+esac
+
+if [ -n "$jupyter" ]; then
+  tmux new-window -d -t "=$name:" -n jupyter -c "$dir"
+  jp="$(tmux display-message -p -t "=$name:jupyter" '#{pane_id}')"
+  title "$jp" "jupyterlab"
+  # Only reachable on 127.0.0.1 (VM: through the SSH tunnel, WSL: directly from Windows),
+  # with a token, without a terminal in the browser, kernel over local sockets instead of TCP.
+  # Nothing is fetched in the background: no installs from the browser, no news, no update check.
+  lab=("$venv_tool/bin/jupyter" lab --no-browser --ip=127.0.0.1 --port=8888 "--ServerApp.root_dir=$dir"
+    --ServerApp.terminals_enabled=False --KernelManager.transport=ipc --LabApp.extension_manager=readonly
+    --LabApp.news_url=None --LabApp.check_for_updates_class=jupyterlab.NeverCheckForUpdate)
+  run "$jp" "$(printf '%q ' "${lab[@]}")"
+fi
+
+tmux new-window -d -t "=$name:" -n shell -c "$dir"
+tmux select-window -t "=$name:main"
+tmux select-pane -t "$focus"
+attach
