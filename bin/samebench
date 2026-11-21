@@ -1,0 +1,1104 @@
+#!/usr/bin/env bash
+# samebench - set up, update and check this machine
+#
+#   samebench plan [profile]          show what would be installed or changed (downloads nothing)
+#   samebench apply [-y] [profile]    show the plan, then set up and install after confirmation
+#   samebench update                  update day: pull new versions (at least 7 days old) into the lockfiles
+#   samebench sync [-y]               take the repository's latest state, then samebench apply
+#   samebench doctor                  check the state of this machine
+#   samebench jupyter                 install the Jupyter tool (dev -j does this the first time)
+#   samebench remove [-y]             undo everything samebench set up
+#   samebench check [folder]          security advisories (OSV.dev) for the installed versions
+#   samebench fix <package> <version> lift one tool or Jupyter package to its fixed version
+#   samebench check-system            only check the system requirements
+#
+# First setup on a new machine: <repository>/bin/samebench apply <profile>   (for example mac or linux)
+#
+# Plain Bash on purpose, it also runs on the old Bash 3.2 of macOS.
+set -euo pipefail
+
+# mise is the one program samebench downloads itself, everything else comes through mise
+# from mise.lock. To update it, put in the new version and the sums from the release's
+# SHA256SUMS file (see the docs, "Update day"). The platforms match LOCK_PLATFORMS below.
+MISE_VERSION="2026.11.5" # released 2026-11-09
+MISE_SHA256_macos_arm64="f69c8a4f7c265d5f3ffdd06d44104aa15a7ffd9b6545a87b7768f893b70f0fd8"
+MISE_SHA256_linux_x64="d7dee029352bf4b8986e7c4696b8ce54746c3eb648ffca3cc69bdeecc0ff06e9"
+MISE_SHA256_linux_arm64="146b114c2714f6ed76a629778f162d578e14821e47b87389dbdd64068bd5cf06"
+
+SAMEBENCH_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+STATE_DIR="$CONFIG_HOME/samebench"
+DATA_DIR="$DATA_HOME/samebench"
+JUPYTER_VENV="$DATA_DIR/jupyter-venv"
+KERNEL_REQS="$DATA_DIR/kernel-requirements.txt"
+MISE_LOCK="$SAMEBENCH_REPO/config/mise-global/mise.lock"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/samebench"
+LOCKFILES="config/mise-global/mise.lock envs/jupyter/uv.lock modules"
+JUPYTER_PROJECT="$SAMEBENCH_REPO/envs/jupyter"
+LOCK_PLATFORMS="macos-arm64,linux-x64,linux-arm64"
+# Neovim gets its own config and data folders (~/.config/samebench-nvim,
+# ~/.local/share/samebench-nvim), so an existing Neovim setup stays untouched.
+NVIM_APP="samebench-nvim"
+export NVIM_APPNAME="$NVIM_APP"
+RC_LINE='[ -f "$HOME/.config/samebench/env.sh" ] && . "$HOME/.config/samebench/env.sh" # samebench'
+# Python does not come from apt but from uv when a project needs it (see the docs)
+APT_PACKAGES="git curl ca-certificates build-essential tar gzip"
+
+# shellcheck source=../libexec/common.sh
+. "$SAMEBENCH_REPO/libexec/common.sh"
+item() { printf '   %-3s %s\n' "$1" "$2"; }
+
+export PATH="$HOME/.local/bin:$PATH"
+
+# --------------------------------------------------------------- Profile ---
+profiles() { (cd "$SAMEBENCH_REPO/profiles" && ls | sed 's/\.sh$//' | tr '\n' ' '); }
+
+load_profile() {
+  local name="${1:-}"
+  if [ -z "$name" ] && [ -f "$STATE_DIR/profile" ]; then name="$(cat "$STATE_DIR/profile")"; fi
+  [ -n "$name" ] || die "No profile given. Available: $(profiles)"
+  [ -f "$SAMEBENCH_REPO/profiles/$name.sh" ] || die "Profile '$name' not found. Available: $(profiles)"
+  MODULES="core"
+  LAYOUT="code"
+  AGENT_CMD=""
+  UV_PYTHON_DOWNLOADS="manual"
+  ICONS="unicode"
+  JUPYTER="ondemand"
+  ACTIVATE="global"
+  CHECK="daily"   # daily check when dev starts: daily | off
+  UPDATER="no"    # yes = this machine maintains the lockfiles (commit + push)
+  # shellcheck source=/dev/null
+  . "$SAMEBENCH_REPO/profiles/$name.sh"
+  # Settings for this machine only, not part of the repository
+  # shellcheck source=/dev/null
+  if [ -f "$STATE_DIR/local.sh" ]; then . "$STATE_DIR/local.sh"; fi
+  PROFILE="$name"
+  case "$JUPYTER" in yes | ondemand | no) ;; *) die "JUPYTER=\"$JUPYTER\", allowed: yes | ondemand | no" ;; esac
+  case "$ACTIVATE" in global | dev) ;; *) die "ACTIVATE=\"$ACTIVATE\", allowed: global | dev" ;; esac
+  case "$CHECK" in daily | off) ;; *) die "CHECK=\"$CHECK\", allowed: daily | off" ;; esac
+  export UV_PYTHON_DOWNLOADS
+}
+
+has_module() { case " $MODULES " in *" $1 "*) return 0 ;; esac; return 1; }
+all_modules() { (cd "$SAMEBENCH_REPO/modules" && ls); }
+
+# --------------------------------------------------------------- Helpers ---
+newest_backup() { ls -dt "$1".backup-* 2>/dev/null | head -1; }
+
+# link <source> <target>: create a symlink; existing foreign files are backed up first.
+link() {
+  local src="$1" dst="$2"
+  mkdir -p "$(dirname "$dst")"
+  if [ -L "$dst" ]; then
+    [ "$(readlink "$dst")" = "$src" ] && return 0
+    rm "$dst"
+  elif [ -e "$dst" ]; then
+    local backup
+    backup="$dst.backup-$(date +%Y%m%d-%H%M%S)"
+    warn "$dst already exists, backed up as $backup"
+    mv "$dst" "$backup"
+  fi
+  ln -s "$src" "$dst"
+}
+
+# unlink_own <target> <pattern>: remove our own link and restore a backup if there is one
+unlink_own() {
+  local dst="$1" pattern="$2" target backup
+  [ -L "$dst" ] || return 1
+  target="$(readlink "$dst")"
+  # shellcheck disable=SC2254
+  case "$target" in $pattern) ;; *) return 1 ;; esac
+  rm "$dst"
+  backup="$(newest_backup "$dst")"
+  if [ -n "$backup" ]; then
+    mv "$backup" "$dst"
+    ok "$dst: restored your previous file (from $(basename "$backup"))"
+  fi
+  return 0
+}
+
+# Append a line to a file unless it is already there
+ensure_line() {
+  local line="$1" file="$2"
+  mkdir -p "$(dirname "$file")"
+  touch "$file"
+  grep -qxF "$line" "$file" || printf '%s\n' "$line" >>"$file"
+}
+
+# Remove an exact line from a file if it is there
+remove_line() {
+  local line="$1" file="$2" tmp
+  [ -f "$file" ] && grep -qxF "$line" "$file" || return 0
+  tmp="$(mktemp)"
+  grep -vxF "$line" "$file" >"$tmp" || true
+  cat "$tmp" >"$file" # replace the content, keep permissions and links of the file
+  rm -f "$tmp"
+}
+
+need_mise() {
+  command -v mise >/dev/null 2>&1 || die "mise is missing, run 'samebench apply <profile>' first."
+}
+
+mise_env() { eval "$(cd "$HOME" && mise env -s bash)"; }
+
+# git_global_file <setting> <default name>: your global attributes or ignore file
+git_global_file() {
+  git config --global --type=path --get "$1" 2>/dev/null || printf '%s' "$CONFIG_HOME/git/$2"
+}
+
+platform() {
+  case "$(uname -s)-$(uname -m)" in
+    Darwin-arm64) echo macos-arm64 ;;
+    Darwin-x86_64) echo macos-x64 ;;
+    Linux-x86_64) echo linux-x64 ;;
+    Linux-aarch64 | Linux-arm64) echo linux-arm64 ;;
+    *) echo unknown ;;
+  esac
+}
+
+# ------------------------------------------------------------------ mise ---
+MISE_BIN="$HOME/.local/bin/mise"
+
+# Version of the mise in ~/.local/bin, empty when there is none. The variable keeps
+# mise from looking for newer versions online, which it would do before any config exists.
+mise_version() {
+  [ -x "$MISE_BIN" ] && MISE_DISABLE_UPDATE_WARNING=1 "$MISE_BIN" --version 2>/dev/null | awk 'NR == 1 { print $1 }' || true
+}
+
+# Sets mise_url and mise_sum for this machine
+mise_download() {
+  local plat var
+  plat="$(platform)"
+  var="MISE_SHA256_$(printf '%s' "$plat" | tr - _)"
+  [ -n "${!var:-}" ] || die "No pinned mise for this platform ($(uname -s) $(uname -m))."
+  mise_url="https://github.com/jdx/mise/releases/download/v$MISE_VERSION/mise-v$MISE_VERSION-$plat.tar.gz"
+  mise_sum="${!var}"
+}
+
+# Install the pinned mise unless exactly this version is there. Runs in a
+# subshell so the trap removes the download folder in every case.
+install_mise() (
+  local have tmp actual backup
+  have="$(mise_version)"
+  if [ "$have" = "$MISE_VERSION" ]; then ok "mise $MISE_VERSION already installed"; exit 0; fi
+  mise_download
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+  say "Downloading mise $MISE_VERSION: $mise_url"
+  curl --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL -o "$tmp/mise.tar.gz" "$mise_url" ||
+    die "The mise download failed, nothing installed."
+  actual="$(short_hash 64 <"$tmp/mise.tar.gz")"
+  [ "$actual" = "$mise_sum" ] ||
+    die "The mise checksum does NOT match, nothing installed. Expected $mise_sum, got $actual"
+  ok "Checksum verified"
+  tar -xzf "$tmp/mise.tar.gz" -C "$tmp" mise/bin/mise
+  # Only a machine samebench has never set up can have a mise of its own, keep it
+  if [ ! -f "$STATE_DIR/profile" ] && { [ -e "$MISE_BIN" ] || [ -L "$MISE_BIN" ]; }; then
+    backup="$MISE_BIN.backup-$(date +%Y%m%d-%H%M%S)"
+    warn "$MISE_BIN (mise ${have:-of unknown version}) already exists, backed up as $backup"
+    mv "$MISE_BIN" "$backup"
+  fi
+  mkdir -p "$(dirname "$MISE_BIN")"
+  install -m 0755 "$tmp/mise/bin/mise" "$MISE_BIN"
+  ok "mise $MISE_VERSION installed to $MISE_BIN"
+)
+
+# --------------------------------------------------- System requirements ---
+check_system() {
+  case "$(uname -s)" in
+    Darwin)
+      if ! xcode-select -p >/dev/null 2>&1; then
+        die "Apple Command Line Tools are missing (git, C compiler). Please run: xcode-select --install"
+      fi
+      ok "Apple Command Line Tools present"
+      ;;
+    Linux)
+      command -v dpkg >/dev/null 2>&1 || die "Only Debian and Ubuntu are supported."
+      local missing="" p
+      for p in $APT_PACKAGES; do
+        dpkg -s "$p" >/dev/null 2>&1 || missing="$missing $p"
+      done
+      if [ -n "$missing" ]; then
+        warn "Missing Ubuntu packages:$missing"
+        if ask "Install them now with \"sudo apt-get install -y$missing\"?"; then
+          # shellcheck disable=SC2086
+          sudo apt-get update && sudo apt-get install -y $missing
+        else
+          die "Please install them and start again."
+        fi
+      fi
+      ok "Ubuntu packages present"
+      if ! dpkg -s unattended-upgrades >/dev/null 2>&1; then
+        warn "unattended-upgrades is not installed, so system security updates won't arrive automatically."
+      fi
+      ;;
+    *) die "Unsupported system: $(uname -s)" ;;
+  esac
+}
+
+# ----------------------------------------------------------------- Links ---
+link_mise_modules() { # link_mise_modules <module...>
+  local confd="$CONFIG_HOME/mise/conf.d" f m
+  mkdir -p "$confd"
+  # only remove our own links, also ones from an earlier repository folder
+  # (after a rename or move), recognisable by .../modules/<module>/tools.toml
+  for f in "$confd"/*.toml; do
+    [ -L "$f" ] || continue
+    case "$(readlink "$f")" in "$SAMEBENCH_REPO"/* | */modules/*/tools.toml) rm "$f" ;; esac
+  done
+  for m in "$@"; do
+    [ -f "$SAMEBENCH_REPO/modules/$m/tools.toml" ] && ln -s "$SAMEBENCH_REPO/modules/$m/tools.toml" "$confd/$m.toml"
+  done
+  return 0
+}
+
+# Every link samebench creates, as "source|target"
+link_list() {
+  printf '%s|%s\n' \
+    "$SAMEBENCH_REPO/config/nvim" "$CONFIG_HOME/$NVIM_APP" \
+    "$SAMEBENCH_REPO/config/mise-global/settings.toml" "$CONFIG_HOME/mise/config.toml" \
+    "$MISE_LOCK" "$CONFIG_HOME/mise/mise.lock"
+}
+
+link_configs() {
+  say "Linking the configuration"
+  local pair
+  while IFS= read -r pair; do link "${pair%%|*}" "${pair#*|}"; done <<EOF
+$(link_list)
+EOF
+  # shellcheck disable=SC2086
+  link_mise_modules $MODULES
+  ok "Configuration linked"
+}
+
+write_env() {
+  say "Writing the shell environment"
+  mkdir -p "$STATE_DIR"
+  printf '%s\n' "$PROFILE" >"$STATE_DIR/profile"
+  cat >"$STATE_DIR/env.sh" <<EOF
+# Generated by "samebench apply", don't edit by hand (profile: $PROFILE, activation: $ACTIVATE)
+
+# --- Part 1 (always): only make samebench, dev, jlab and mise reachable
+export SAMEBENCH_REPO="$SAMEBENCH_REPO"
+export SAMEBENCH_PROFILE="$PROFILE"
+export SAMEBENCH_ACTIVATE="$ACTIVATE"
+export SAMEBENCH_MODULES="$MODULES"
+export SAMEBENCH_LAYOUT="$LAYOUT"
+export SAMEBENCH_AGENT_CMD="$AGENT_CMD"
+export SAMEBENCH_JUPYTER="$JUPYTER"
+export SAMEBENCH_JUPYTER_VENV="$JUPYTER_VENV"
+export SAMEBENCH_UV_PYTHON_DOWNLOADS="$UV_PYTHON_DOWNLOADS"
+export SAMEBENCH_ICONS="$ICONS"
+case ":\$PATH:" in *":\$HOME/.local/bin:"*) ;; *) PATH="\$HOME/.local/bin:\$PATH" ;; esac
+case ":\$PATH:" in *":$SAMEBENCH_REPO/bin:"*) ;; *) PATH="$SAMEBENCH_REPO/bin:\$PATH" ;; esac
+export PATH
+
+# Activation "dev": everything below only runs inside dev sessions, other shells
+# stay as they were (existing uv, Jupyter, VS Code, ...).
+if [ "\$SAMEBENCH_ACTIVATE" = dev ] && [ -z "\${SAMEBENCH_SESSION:-}" ]; then return 0 2>/dev/null || true; fi
+
+# --- Part 2: tools from mise, editor, project environment
+export NVIM_APPNAME="$NVIM_APP"
+export UV_PYTHON_DOWNLOADS="\$SAMEBENCH_UV_PYTHON_DOWNLOADS"
+export LG_CONFIG_FILE="$SAMEBENCH_REPO/config/lazygit/config.yml$( [ "$ICONS" = nerd ] && printf ',%s' "$SAMEBENCH_REPO/config/lazygit/nerd.yml" )"
+export JUPYTER_CONFIG_PATH="$SAMEBENCH_REPO/config/jupyter"
+export EDITOR=nvim VISUAL=nvim
+# Put the project environment (.venv) set by "dev" back in front of the PATH
+# (macOS resets the PATH whenever a login shell starts)
+if [ -n "\${VIRTUAL_ENV:-}" ] && [ -d "\$VIRTUAL_ENV/bin" ]; then
+  case ":\$PATH:" in *":\$VIRTUAL_ENV/bin:"*) ;; *) PATH="\$VIRTUAL_ENV/bin:\$PATH" ;; esac
+fi
+export PATH
+if command -v mise >/dev/null 2>&1; then
+  if [ -n "\${ZSH_VERSION:-}" ]; then eval "\$(mise activate zsh)"
+  elif [ -n "\${BASH_VERSION:-}" ]; then eval "\$(mise activate bash)"; fi
+fi
+EOF
+  # tmux addition per profile (round pills only with a Nerd Font)
+  if [ "$ICONS" = nerd ]; then
+    cp "$SAMEBENCH_REPO/config/tmux/nerd.conf" "$STATE_DIR/tmux.conf"
+  else
+    printf '# Profile without a Nerd Font, square pills from tmux.conf\n' >"$STATE_DIR/tmux.conf"
+  fi
+  ensure_line "$RC_LINE" "$HOME/.zshrc"
+  ensure_line "$RC_LINE" "$HOME/.bashrc"
+  ok "Environment loaded from ~/.zshrc and ~/.bashrc (activation: $ACTIVATE)"
+}
+
+# Git: show notebooks as Python code in diffs and ignore shadow files.
+# Only changes YOUR global git config, never a repository. Without the
+# Jupyter tool, git just shows the normal diff (libexec/ipynb-textconv).
+setup_git() {
+  has_module python || return 0
+  say "Git settings for notebooks"
+  cat >"$STATE_DIR/gitconfig" <<EOF
+# Generated by "samebench apply"
+[diff "samebench-ipynb"]
+	textconv = "$SAMEBENCH_REPO/libexec/ipynb-textconv"
+	cachetextconv = true
+EOF
+  if ! git config --global --get-all include.path 2>/dev/null | grep -qxF "$STATE_DIR/gitconfig"; then
+    git config --global --add include.path "$STATE_DIR/gitconfig"
+  fi
+  ensure_line '*.ipynb diff=samebench-ipynb' "$(git_global_file core.attributesFile attributes)"
+  ensure_line '.*.nb.py' "$(git_global_file core.excludesFile ignore)"
+  ok "Notebook diffs and shadow files set up"
+}
+
+# ------------------------------------------------------------- Installs ---
+install_tools() {
+  need_mise
+  if [ ! -s "$MISE_LOCK" ]; then
+    warn "No mise.lock yet, creating it now (once, commit it afterwards!)."
+    lock_tools
+  fi
+  say "Installing tools exactly as listed in mise.lock"
+  (cd "$HOME" && mise install --locked)
+  ok "Tools installed"
+}
+
+lock_tools() {
+  # Always lock ALL modules and platforms, so every machine uses the same
+  # complete lockfile.
+  local status=0
+  # shellcheck disable=SC2046
+  link_mise_modules $(all_modules)
+  (cd "$HOME" && mise lock --global --platform "$LOCK_PLATFORMS" "$@") || status=$?
+  # shellcheck disable=SC2086
+  link_mise_modules $MODULES
+  [ "$status" -eq 0 ] || return "$status"
+  # mise may replace the link with a real file, move it back into the repository
+  if [ -f "$CONFIG_HOME/mise/mise.lock" ] && [ ! -L "$CONFIG_HOME/mise/mise.lock" ]; then
+    mv "$CONFIG_HOME/mise/mise.lock" "$MISE_LOCK"
+    ln -s "$MISE_LOCK" "$CONFIG_HOME/mise/mise.lock"
+  fi
+}
+
+# lock_entries <lockfile>: the plugins of a lazy-lock.json as "name|commit"
+lock_entries() { sed -n 's/^  "\([^"]*\)".*"commit": "\([0-9a-f]*\)".*/\1|\2/p' "$1"; }
+
+# plugin_mismatch <lockfile>: prints the first plugin that is missing or not checked out
+# at exactly its locked commit, and nothing when every plugin matches
+plugin_mismatch() {
+  local name commit
+  while IFS='|' read -r name commit; do
+    [ -n "$name" ] || continue
+    if [ "$(git -C "$DATA_HOME/$NVIM_APP/lazy/$name" rev-parse HEAD 2>/dev/null)" != "$commit" ]; then
+      printf '%s\n' "$name"
+      return 0
+    fi
+  done <<EOF
+$(lock_entries "$1")
+EOF
+}
+
+# pin_lost <before> <after>: prints the first plugin whose pin from <before> did not make it
+# into <after>, and nothing when all of them did. A pin is lost when its commit changed, or
+# when the plugin left the list although it is not installed. A plugin that left the list and
+# is still installed was dropped by a new LazyVim version, which is fine.
+pin_lost() {
+  local name commit now
+  while IFS='|' read -r name commit; do
+    [ -n "$name" ] || continue
+    now="$(lock_entries "$2" | awk -F'|' -v n="$name" '$1 == n { print $2 }')"
+    if [ -n "$now" ] && [ "$now" != "$commit" ]; then printf '%s\n' "$name"; return 0; fi
+    if [ -z "$now" ] && [ ! -d "$DATA_HOME/$NVIM_APP/lazy/$name" ]; then printf '%s\n' "$name"; return 0; fi
+  done <<EOF
+$(lock_entries "$1")
+EOF
+}
+
+install_nvim_plugins() {
+  say "Neovim plugins"
+  mise_env
+  local lock="$SAMEBENCH_REPO/config/nvim/lazy-lock.json" keep bad
+  if [ -s "$lock" ]; then
+    # lazy.nvim writes lazy-lock.json again after every install, from the plugins it finds
+    # installed. A run that fails halfway would drop pins that way, and the next run would
+    # install the newest commits instead. So the pinned list is kept aside, put back when
+    # lazy.nvim changed it, and the checkouts are compared with it at the end.
+    keep="$(mktemp)"
+    cat "$lock" >"$keep"
+    for _ in 1 2; do
+      nvim --headless "+Lazy! restore" +qa || true
+      cmp -s "$keep" "$lock" && break
+      warn "lazy.nvim changed lazy-lock.json, putting the pinned list back."
+      cat "$keep" >"$lock" # replace the content, keep the file itself
+    done
+    cmp -s "$keep" "$lock" || cat "$keep" >"$lock"
+    rm -f "$keep"
+    bad="$(plugin_mismatch "$lock")"
+    [ -z "$bad" ] ||
+      die "The Neovim plugins do NOT match lazy-lock.json (first one: $bad). The lockfile is unchanged, run 'samebench apply' again."
+    ok "Plugins match the lockfile"
+  else
+    warn "No lazy-lock.json yet, installing plugins fresh (commit it afterwards!)."
+    nvim --headless "+Lazy! sync" +qa
+  fi
+}
+
+# --------------------------------------------------------- Jupyter tool ---
+# Only Jupyter itself (envs/jupyter), no project packages. Installed when it
+# is first needed (dev -j), or right away with apply when JUPYTER="yes".
+
+jupyter_installed() { [ -x "$JUPYTER_VENV/bin/jupyter" ]; }
+
+# Python for the tool: use one that exists, otherwise install one with uv after asking
+ensure_tool_python() {
+  if uv python find --project "$JUPYTER_PROJECT" >/dev/null 2>&1; then return 0; fi
+  warn "No suitable Python (3.10 or newer) found."
+  echo "   uv can install one (python-build-standalone by Astral, checksum stored in uv)," >&2
+  echo "   placed in ~/.local/share/uv/python without touching the system." >&2
+  ask "Install Python with uv now (uv python install)?" || die "Cancelled, Jupyter needs Python."
+  uv python install
+}
+
+jupyter_count() { grep -c '^\[\[package\]\]' "$JUPYTER_PROJECT/uv.lock" 2>/dev/null || echo "?"; }
+
+# What will be installed, shown before installing
+jupyter_summary() {
+  echo "   Source:  $JUPYTER_PROJECT/uv.lock (pinned versions, hashes verified)"
+  echo "   Size:    $(jupyter_count) package entries (jupyterlab, jupyter-console, jupytext, ipykernel and dependencies)"
+  echo "   Target:  $JUPYTER_VENV"
+}
+
+sync_jupyter() {
+  [ -s "$JUPYTER_PROJECT/uv.lock" ] || die "envs/jupyter/uv.lock is missing, run 'samebench update' on the updater machine and commit."
+  UV_PROJECT_ENVIRONMENT="$JUPYTER_VENV" uv sync --frozen --project "$JUPYTER_PROJECT"
+  # ipykernel and its dependencies with hashes, for projects without their own ipykernel
+  mkdir -p "$DATA_DIR"
+  uv export --quiet --frozen --project "$JUPYTER_PROJECT" --only-group kernel --no-emit-project -o "$KERNEL_REQS"
+}
+
+# cmd_jupyter [--yes]: install the tool or bring it up to the lockfile
+cmd_jupyter() {
+  load_profile ""
+  need_mise
+  mise_env
+  [ "$JUPYTER" != no ] || die "Jupyter is turned off in this profile (JUPYTER=\"no\")."
+  has_module python || die "Jupyter needs the python module (uv) in the profile."
+  command -v uv >/dev/null 2>&1 || die "uv is missing, run 'samebench apply'."
+  if ! jupyter_installed; then
+    say "The Jupyter tool is not installed yet."
+    jupyter_summary
+    if [ "${1:-}" != "--yes" ]; then
+      ask "Install it now?" || die "Cancelled."
+    fi
+  else
+    say "Bringing the Jupyter tool up to the lockfile"
+  fi
+  ensure_tool_python
+  sync_jupyter
+  ok "Jupyter tool ready: $JUPYTER_VENV"
+}
+
+# cmd_kernel <folder>: write a "python3" kernel definition for the project's
+# .venv and print the folder for JUPYTER_PATH (nothing without a .venv).
+cmd_kernel() {
+  local dir="${1:?folder missing}" venv py name kroot kdir pyver overlay site=""
+  dir="$(cd "$dir" && pwd -P)"
+  venv="$dir/.venv"
+  py="$venv/bin/python"
+  [ -x "$py" ] || return 0
+  jupyter_installed || die "The Jupyter tool is missing, run 'samebench jupyter'."
+  load_profile ""
+  mise_env
+  name="$(basename "$dir")"
+  if ! ls -d "$venv"/lib/python*/site-packages/ipykernel >/dev/null 2>&1; then
+    # The project has no ipykernel: install it (pinned versions, hashes verified)
+    # into a small separate environment, the project itself stays unchanged.
+    [ -s "$KERNEL_REQS" ] || sync_jupyter >/dev/null
+    pyver="$("$py" -I -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+    # Named after the Python version and the package list (without comments), same list = reuse
+    overlay="$DATA_DIR/kernel-overlays/py$pyver-$(grep -v '^#' "$KERNEL_REQS" | short_hash 12)"
+    if [ ! -d "$overlay" ]; then
+      say "The project has no ipykernel, adding it for the kernel only (pinned versions, hashes verified)" >&2
+      rm -rf "$overlay.tmp"
+      uv venv --quiet --python "$py" "$overlay.tmp" >&2
+      uv pip install --quiet --require-hashes --python "$overlay.tmp" -r "$KERNEL_REQS" >&2
+      mv "$overlay.tmp" "$overlay"
+    fi
+    site="$(ls -d "$overlay"/lib/python*/site-packages | head -1)"
+  fi
+  kroot="$DATA_DIR/kernelspecs/$name-$(printf '%s' "$dir" | short_hash 8)"
+  kdir="$kroot/kernels/python3"
+  mkdir -p "$kdir"
+  json_str() { printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
+  {
+    printf '{\n  "argv": [%s, "-m", "ipykernel_launcher", "-f", "{connection_file}"],\n' "$(json_str "$py")"
+    if [ -n "$site" ]; then printf '  "env": {"PYTHONPATH": %s},\n' "$(json_str "$site")"; fi
+    printf '  "display_name": %s,\n  "language": "python"\n}\n' "$(json_str "Python ($name/.venv)")"
+  } >"$kdir/kernel.json"
+  printf '%s\n' "$kroot"
+}
+
+# ------------------------------------------------------------------ Plan ---
+# Tools of the active modules from mise.lock: "tool|version|verification|url"
+plan_tools() {
+  local plat="$1" keys m
+  keys="$(for m in $MODULES; do
+    [ -f "$SAMEBENCH_REPO/modules/$m/tools.toml" ] && sed -n 's/^"\([^"]*\)".*/\1/p' "$SAMEBENCH_REPO/modules/$m/tools.toml"
+  done | tr '\n' ' ')"
+  awk -v plat="$plat" -v keys="$keys" '
+    BEGIN { n = split(keys, k, " "); for (i = 1; i <= n; i++) want[k[i]] = 1 }
+    /^\[\[tools\."/ { match($0, /"[^"]+"/); tool = substr($0, RSTART + 1, RLENGTH - 2); inplat = 0; next }
+    /^\[tools\."/ { inplat = (index($0, "\"platforms." plat "\"]") > 0); next }
+    !inplat && /^version = / { v = $3; gsub(/"/, "", v); ver[tool] = v }
+    inplat && /^url = / { u = $3; gsub(/"/, "", u); url[tool] = u }
+    inplat && /^provenance = / { p = $3; gsub(/"/, "", p); prov[tool] = p }
+    inplat && /^checksum = / { chk[tool] = 1 }
+    END { for (t in ver) if (want[t]) print t "|" ver[t] "|" (prov[t] != "" ? "checksum + " prov[t] : (chk[t] ? "checksum" : "-")) "|" url[t] }
+  ' "$MISE_LOCK" | sort
+}
+
+# State of a target that samebench would link
+link_status() {
+  local src="$1" dst="$2"
+  if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then echo "ok|already set up"
+  elif [ -L "$dst" ]; then echo "~|link will be replaced (points to $(readlink "$dst") today)"
+  elif [ -e "$dst" ]; then echo "!|exists, will be backed up (.backup-<date>) and replaced"
+  else echo "+|new (link into the repository)"; fi
+}
+
+cmd_plan() {
+  load_profile "${1:-}"
+  local plat pair st t ver how url p n missing found have
+  plat="$(platform)"
+  mise_download
+  have="$(mise_version)"
+  echo
+  say "Plan for profile \"$PROFILE\" on $plat, NOTHING is changed yet"
+  echo "   Modules: $MODULES · activation: $ACTIVATE · Jupyter: $JUPYTER · Python downloads: $UV_PYTHON_DOWNLOADS"
+  [ -f "$STATE_DIR/local.sh" ] && echo "   Machine settings: $STATE_DIR/local.sh"
+
+  echo
+  say "Programs (mise pinned in samebench, the rest from mise.lock)   ↓ = will be downloaded"
+  if [ "$have" = "$MISE_VERSION" ]; then st="ok"; else st="↓"; fi
+  item "$st" "$(printf '%-28s %-9s %s' mise "$MISE_VERSION" "pinned SHA-256")"
+  if [ "$st" = "↓" ]; then
+    printf '         %s\n' "$mise_url"
+    if [ -n "$have" ] && [ ! -f "$STATE_DIR/profile" ]; then
+      printf '         replaces mise %s in %s, which is kept as a backup (.backup-<date>)\n' "$have" "$MISE_BIN"
+    elif [ -n "$have" ]; then
+      printf '         replaces mise %s in %s\n' "$have" "$MISE_BIN"
+    fi
+  fi
+  while IFS='|' read -r t ver how url; do
+    [ -n "$t" ] || continue
+    if command -v mise >/dev/null 2>&1 && (cd "$HOME" && mise where "$t@$ver" >/dev/null 2>&1); then st="ok"; else st="↓"; fi
+    item "$st" "$(printf '%-28s %-9s %s' "${t#aqua:}" "$ver" "$how")"
+    [ "$st" = "↓" ] && printf '         %s\n' "$url"
+  done <<EOF
+$(plan_tools "$plat")
+EOF
+
+  echo
+  say "Neovim plugins (exact commits from lazy-lock.json, source: GitHub)"
+  n="$(grep -c '"commit"' "$SAMEBENCH_REPO/config/nvim/lazy-lock.json" 2>/dev/null || echo 0)"
+  missing=0
+  for p in $(sed -n 's/^  "\([^"]*\)".*/\1/p' "$SAMEBENCH_REPO/config/nvim/lazy-lock.json"); do
+    [ -d "$DATA_HOME/$NVIM_APP/lazy/$p" ] || missing=$((missing + 1))
+  done
+  if [ "$missing" -eq 0 ]; then item ok "$n plugins present"
+  else item "↓" "$missing of $n plugins will be downloaded (git clone, then the locked commit)"; fi
+  item "" "Treesitter parsers: source code from GitHub, compiled locally (locked through nvim-treesitter)"
+
+  echo
+  say "Python and Jupyter"
+  if [ "$JUPYTER" = no ]; then item "-" "Jupyter turned off"
+  elif jupyter_installed; then item ok "Jupyter tool installed ($JUPYTER_VENV)"
+  elif [ "$JUPYTER" = yes ]; then item "↓" "Jupyter tool: $(jupyter_count) package entries from envs/jupyter/uv.lock (hashes)"
+  else item "-" "Jupyter tool: only on the first 'dev -j' (after asking, $(jupyter_count) package entries)"; fi
+  item "-" "Python: no download by samebench, uv only installs after asking (UV_PYTHON_DOWNLOADS=$UV_PYTHON_DOWNLOADS)"
+
+  echo
+  say "Changes to your system"
+  while IFS= read -r pair; do
+    st="$(link_status "${pair%%|*}" "${pair#*|}")"
+    item "${st%%|*}" "${pair#*|}: ${st#*|}"
+  done <<EOF
+$(link_list)
+EOF
+  for m in $MODULES; do
+    [ -f "$SAMEBENCH_REPO/modules/$m/tools.toml" ] || continue
+    st="$(link_status "$SAMEBENCH_REPO/modules/$m/tools.toml" "$CONFIG_HOME/mise/conf.d/$m.toml")"
+    item "${st%%|*}" "$CONFIG_HOME/mise/conf.d/$m.toml: ${st#*|}"
+  done
+  for p in "$HOME/.zshrc" "$HOME/.bashrc"; do
+    if grep -qxF "$RC_LINE" "$p" 2>/dev/null; then item ok "$p: line for samebench present"
+    else item "+" "$p: one line will be appended (loads ~/.config/samebench/env.sh)"; fi
+  done
+  if [ "$ACTIVATE" = dev ]; then
+    item "" "Activation \"dev\": outside dev sessions only samebench, dev and jlab are added to the PATH, everything else stays as it is"
+  else
+    item "" "Activation \"global\": tools from mise come first in the PATH of every shell"
+  fi
+  if has_module python; then
+    if git config --global --get-all include.path 2>/dev/null | grep -qxF "$STATE_DIR/gitconfig"; then item ok "git (global): notebook diffs set up"
+    else item "+" "git (global): include.path, '*.ipynb diff=samebench-ipynb', ignore '.*.nb.py'"; fi
+  fi
+  item "" "tmux: its own server (tmux -L samebench) with the configuration from the repository, your tmux stays untouched"
+  item "" "Neovim: its own folder ~/.config/$NVIM_APP, an existing ~/.config/nvim stays untouched"
+  if [ -e "$CONFIG_HOME/uv/uv.toml" ] && [ ! -L "$CONFIG_HOME/uv/uv.toml" ]; then
+    item ok "$CONFIG_HOME/uv/uv.toml: stays unchanged (your own uv settings)"
+  fi
+
+  echo
+  say "Programs already installed outside samebench (left untouched)"
+  found=""
+  for t in nvim tmux lazygit rg fd uv ruff ty jupyter python3; do
+    for p in $(type -ap "$t" 2>/dev/null | awk '!seen[$0]++'); do
+      case "$p" in "$DATA_HOME/mise/"* | "$SAMEBENCH_REPO/"* | */.venv/* | "$DATA_DIR/"*) continue ;; esac
+      [ "$p" = /usr/bin/python3 ] && [ "$(uname -s)" = Darwin ] && continue
+      found=1
+      if [ "$ACTIVATE" = dev ]; then item "=" "$(printf '%-8s %s  (shadowed only inside dev sessions)' "$t" "$p")"
+      else item "=" "$(printf '%-8s %s  (shadowed while mise is active)' "$t" "$p")"; fi
+    done
+  done
+  [ -n "$found" ] || item ok "none"
+  if [ -n "$found" ] && [ "$ACTIVATE" = global ]; then
+    echo "   Tip: to keep these unchanged outside dev sessions, put ACTIVATE=\"dev\" into $STATE_DIR/local.sh"
+  fi
+  echo
+}
+
+# --------------------------------------------------- Security and updates ---
+# Findings (libexec/samebench-check.lua): severity|kind|ecosystem|package|version|id|fixed|summary|tool
+
+# run_check [project folder] returns 0 when checked, 2 when the check did not finish
+run_check() {
+  local project="${1:-}" venv=""
+  mkdir -p "$CACHE_DIR"
+  jupyter_installed && venv="$JUPYTER_VENV"
+  if [ -n "$project" ] && [ ! -f "$project/uv.lock" ]; then project=""; fi
+  mise_env 2>/dev/null || true
+  command -v nvim >/dev/null 2>&1 || { warn "nvim is missing, run 'samebench apply'."; return 2; }
+  command -v curl >/dev/null 2>&1 || { warn "curl is missing."; return 2; }
+  # NVIM_APPNAME doesn't matter here, nvim -l loads no configuration
+  if nvim -l "$SAMEBENCH_REPO/libexec/samebench-check.lua" "$SAMEBENCH_REPO" "$venv" "$CACHE_DIR/check.txt" "$project"; then
+    touch "$CACHE_DIR/check.stamp"
+    return 0
+  fi
+  return 2
+}
+
+# Fix target per package: the highest "fixed in" of all high or critical findings
+# Output: kind|package|version|target|tool|ids   (empty target = no fix known)
+urgent_targets() {
+  awk -F'|' '($1=="HIGH"||$1=="CRITICAL") && ($2=="tool"||$2=="jupyter") {
+      k=$2"|"$4; ver[k]=$5; tool[k]=$9; ids[k]=ids[k] (ids[k]?" ":"") $6
+      if ($7=="") nofix[k]=1
+      else if (!(k in best)) best[k]=$7
+      else { split(best[k],a,"."); split($7,b,"."); for(i=1;i<=4;i++){ if(b[i]+0>a[i]+0){best[k]=$7;break} if(b[i]+0<a[i]+0)break } }
+    }
+    END { for (k in ver) print k "|" ver[k] "|" (k in nofix ? "" : best[k]) "|" tool[k] "|" ids[k] }' "$1"
+}
+
+show_details() { # every finding, readable
+  awk -F'|' '{ printf "   %-9s %-8s %s %s  %s%s\n      %s\n", $1, ($2=="tool"?"tool":($2=="jupyter"?"Jupyter":"project")), $4, $5, $6, ($7!=""?"  → fixed in "$7:"  → no fix yet"), $8 }' "$1"
+}
+
+# offer_fixes <findings>: offer fixes for high or critical findings in tools and Jupyter
+offer_fixes() {
+  local f="$1" kind pkg ver target tool ids
+  while IFS='|' read -r kind pkg ver target tool ids; do
+    [ -n "$kind" ] || continue
+    if [ -z "$target" ]; then
+      warn "$pkg $ver: security advisory ($ids), no fixed version known yet."
+      continue
+    fi
+    warn "$pkg $ver: high or critical security advisory ($ids), fixed in $target"
+    if ask "   Lift $pkg to $target now (exception from the 7 day rule)?"; then
+      cmd_fix "$pkg" "$target" || warn "The update failed, see the details above."
+    fi
+  done <<EOF
+$(urgent_targets "$f")
+EOF
+}
+
+summarize() { # short summary without questions
+  local f="$1" n_tool n_proj n_proj_high
+  n_tool="$(awk -F'|' '$2!="project"' "$f" | wc -l | tr -d ' ')"
+  n_proj="$(awk -F'|' '$2=="project"' "$f" | wc -l | tr -d ' ')"
+  n_proj_high="$(awk -F'|' '$2=="project" && ($1=="HIGH"||$1=="CRITICAL")' "$f" | wc -l | tr -d ' ')"
+  [ "$n_tool" -gt 0 ] && warn "$n_tool security advisory(ies) for tools or Jupyter, details: samebench check"
+  [ "$n_proj" -gt 0 ] && warn "Project: $n_proj advisory(ies) in uv.lock ($n_proj_high high or critical), details: samebench check ."
+  return 0
+}
+
+cmd_check() {
+  local project=""
+  [ -z "${1:-}" ] || project="$(cd "$1" && pwd -P)"
+  load_profile ""
+  say "Checking installed versions against OSV.dev (only package names and versions are sent)"
+  run_check "$project" || die "The check did not finish (is OSV.dev reachable?), try again later."
+  if [ ! -s "$CACHE_DIR/check.txt" ]; then ok "No known vulnerabilities."; return 0; fi
+  show_details "$CACHE_DIR/check.txt"
+  echo
+  echo "   Not covered (no matching package in OSV): Neovim, tmux and Python itself, the update day takes care of them."
+  if awk -F'|' '$2=="project"' "$CACHE_DIR/check.txt" | grep -q .; then
+    echo "   Project findings: the project is never changed, tell its maintainers if needed."
+  fi
+  offer_fixes "$CACHE_DIR/check.txt"
+}
+
+# cmd_fix <package> <version>: lift one tool (mise) or Jupyter package
+cmd_fix() {
+  local pkg="${1:?package missing}" version="${2:?version missing}" kind="" tool="" line
+  load_profile ""
+  need_mise
+  mise_env
+  line="$(awk -F'|' -v p="$pkg" '$4==p && $2!="project" {print $2"|"$9; exit}' "$CACHE_DIR/check.txt" 2>/dev/null || true)"
+  kind="${line%%|*}"; tool="${line#*|}"
+  if [ -z "$kind" ]; then
+    # without findings: recognise a mise tool by its name, otherwise a Jupyter package
+    tool="$(sed -n 's/^\[\[tools\."\([^"]*\)"\]\]/\1/p' "$MISE_LOCK" | grep -i "/$pkg\$" | head -1 || true)"
+    if [ -n "$tool" ]; then kind=tool; else kind=jupyter; fi
+  fi
+  case "$kind" in
+    tool)
+      say "Lifting $tool to $version (mise, the checksum stays mandatory)"
+      (export MISE_MINIMUM_RELEASE_AGE=0s; lock_tools "$tool@$version")
+      (cd "$HOME" && mise install --locked)
+      ;;
+    jupyter)
+      say "Lifting $pkg in the Jupyter tool to $version (hashes stay mandatory)"
+      uv lock --project "$JUPYTER_PROJECT" --upgrade-package "$pkg==$version" --exclude-newer-package "$pkg=false"
+      if jupyter_installed; then sync_jupyter; fi
+      ;;
+  esac
+  ok "$pkg $version installed."
+  # shellcheck disable=SC2086
+  git -C "$SAMEBENCH_REPO" --no-pager diff --stat -- $LOCKFILES
+  if [ "$UPDATER" = yes ]; then
+    if ask "Commit and push, so every machine gets the fix with 'samebench sync'?"; then
+      # shellcheck disable=SC2086
+      git -C "$SAMEBENCH_REPO" add -- $LOCKFILES
+      # shellcheck disable=SC2086
+      git -C "$SAMEBENCH_REPO" commit -q -m "Fix: lift $pkg to $version for a security advisory" -- $LOCKFILES
+      git -C "$SAMEBENCH_REPO" push && ok "Pushed, other machines: samebench sync"
+    fi
+  else
+    mkdir -p "$STATE_DIR"
+    printf '%s|%s|%s\n' "$kind" "${tool:-$pkg}" "$version" >>"$STATE_DIR/local-patches"
+    warn "Patched locally only (this machine doesn't maintain the lockfiles, UPDATER=\"no\")."
+    echo "   Once the repository contains the fix, 'samebench sync' switches back to the repository's state." >&2
+  fi
+  # fetch the findings again on the next dev
+  rm -f "$CACHE_DIR/check.stamp"
+}
+
+# Does the (new) repository state contain a local patch?
+patch_in_repo() { # kind name version (name: mise tool or Jupyter package)
+  local have=""
+  case "$1" in
+    tool) have="$(awk -v h="[[tools.\"$2\"]]" '/^\[\[tools\."/{cur=($0 == h)} cur && /^version = /{gsub(/"/,"",$3); print $3; exit}' "$MISE_LOCK")" ;;
+    jupyter) have="$(awk -v p="$2" '$0=="[[package]]"{n=""} /^name = /{gsub(/"/,"",$3); n=$3} n==p && /^version = /{gsub(/"/,"",$3); print $3; exit}' "$JUPYTER_PROJECT/uv.lock")" ;;
+  esac
+  [ -n "$have" ] || return 1
+  [ "$(printf '%s\n%s\n' "$3" "$have" | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -1)" = "$have" ]
+}
+
+git_fetch_quiet() {
+  GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh} -o BatchMode=yes -o ConnectTimeout=5" \
+    git -C "$SAMEBENCH_REPO" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=5 fetch -q 2>/dev/null
+}
+
+# cmd_daily <folder>: called by dev, goes online at most once a day
+cmd_daily() {
+  local dir="${1:-}" behind last days
+  load_profile "" 2>/dev/null || return 0
+  [ "$CHECK" = daily ] || return 0
+  if [ -n "$(find "$CACHE_DIR/check.stamp" -mmin -1440 2>/dev/null)" ]; then # checked within the last day
+    [ -s "$CACHE_DIR/check.txt" ] && summarize "$CACHE_DIR/check.txt"
+    return 0
+  fi
+  say "Daily check: security advisories and repository state ..."
+  if run_check "$dir"; then
+    if [ -s "$CACHE_DIR/check.txt" ]; then
+      offer_fixes "$CACHE_DIR/check.txt"
+      summarize "$CACHE_DIR/check.txt"
+    else
+      if [ -n "$dir" ] && [ -f "$dir/uv.lock" ]; then ok "No known vulnerabilities in tools, Jupyter and the project."
+      else ok "No known vulnerabilities in tools and Jupyter."; fi
+    fi
+  else
+    warn "The check did not finish (is OSV.dev reachable?), checking again next time."
+  fi
+  if git_fetch_quiet; then
+    behind="$(git -C "$SAMEBENCH_REPO" rev-list --count HEAD..@{u} 2>/dev/null || echo 0)"
+    if [ "${behind:-0}" -gt 0 ]; then
+      if ask "The repository has $behind new commit(s), run 'samebench sync' now?"; then cmd_sync || warn "samebench sync failed."; fi
+    fi
+  fi
+  if [ "$UPDATER" = yes ]; then
+    # shellcheck disable=SC2086
+    last="$(git -C "$SAMEBENCH_REPO" log -1 --format=%ct -- $LOCKFILES 2>/dev/null || echo 0)"
+    days=$(( ($(date +%s) - ${last:-0}) / 86400 ))
+    [ "$days" -ge 30 ] && warn "The last update day was $days days ago, run 'samebench update' when you have a moment."
+  fi
+  return 0
+}
+
+# -------------------------------------------------------------- Commands ---
+cmd_apply() {
+  local yes=""
+  if [ "${1:-}" = "-y" ]; then yes=1; shift; fi
+  load_profile "${1:-}"
+  check_system
+  cmd_plan "$PROFILE"
+  if [ -z "$yes" ]; then ask "Set it up like this?" || die "Cancelled, nothing changed."; fi
+  install_mise
+  link_configs
+  write_env
+  install_tools
+  setup_git
+  install_nvim_plugins
+  if has_module python && [ "$JUPYTER" != no ]; then
+    if jupyter_installed; then
+      say "Jupyter tool"
+      mise_env
+      sync_jupyter
+      ok "Jupyter tool matches the lockfile"
+    elif [ "$JUPYTER" = yes ]; then
+      cmd_jupyter --yes
+    else
+      ok "The Jupyter tool will be installed on the first 'dev -j' (after asking)"
+    fi
+  fi
+  echo
+  ok "Done. Open a new shell (or: source ~/.config/samebench/env.sh), then: dev ~/path/to/project"
+  if [ -n "$(git -C "$SAMEBENCH_REPO" status --porcelain 2>/dev/null)" ]; then
+    warn "The repository has changes (for example new lockfiles), review and commit them:"
+    git -C "$SAMEBENCH_REPO" status --short
+  fi
+}
+
+cmd_update() {
+  load_profile ""
+  need_mise
+  say "UPDATE DAY: pulling new versions (at least 7 days old) into the lockfiles"
+  say "1/4 Tools (mise)"
+  lock_tools --bump
+  (cd "$HOME" && mise install --locked)
+  say "2/4 Neovim plugins (newest commits that are at least 7 days old)"
+  mise_env
+  local lock="$SAMEBENCH_REPO/config/nvim/lazy-lock.json" keep bad
+  keep="$(mktemp)"
+  for _ in 1 2; do # the second round covers plugins that a new LazyVim version added
+    SAMEBENCH_MODULES="all" nvim --headless "+Lazy! check" "+luafile $SAMEBENCH_REPO/libexec/lock-plugins.lua" +qa
+    # lazy.nvim writes the lockfile again after the checkout, from the plugins it finds
+    # installed. It may add or drop plugins that way, but a failed checkout must not take
+    # a pin along that the step above has just chosen.
+    cat "$lock" >"$keep"
+    SAMEBENCH_MODULES="all" nvim --headless "+Lazy! restore" +qa || true
+    bad="$(pin_lost "$keep" "$lock")"
+    if [ -n "$bad" ]; then
+      cat "$keep" >"$lock" # replace the content, keep the file itself
+      rm -f "$keep"
+      die "The checkout of the Neovim plugins failed (first one: $bad). lazy-lock.json keeps the chosen commits, run 'samebench update' again."
+    fi
+  done
+  rm -f "$keep"
+  bad="$(plugin_mismatch "$lock")"
+  [ -z "$bad" ] ||
+    die "The Neovim plugins do NOT match lazy-lock.json (first one: $bad), run 'samebench update' again."
+  if command -v uv >/dev/null 2>&1; then
+    say "3/4 Jupyter tool (envs/jupyter)"
+    ensure_tool_python # uv needs a Python to work the versions out, also when the tool is not installed
+    uv lock --upgrade --project "$JUPYTER_PROJECT"
+    if jupyter_installed; then sync_jupyter; fi
+    say "4/4 Python versions from uv (security patches within each version)"
+    if [ -n "$(uv python list --only-installed --managed-python 2>/dev/null)" ]; then
+      uv python upgrade
+    else
+      ok "no Python versions installed by uv"
+    fi
+  fi
+  echo
+  say "Review the changes (version jumps, changelogs if needed):"
+  git -C "$SAMEBENCH_REPO" --no-pager diff --stat
+  cat <<'EOF'
+
+  Details:   git diff config/mise-global/mise.lock config/nvim/lazy-lock.json envs/jupyter/uv.lock
+  Plugins:   in Neovim, :Lazy → "Log" shows the latest commits per plugin
+  Test:      dev ~/some/project, click through briefly (with -j for Jupyter)
+  Then:      git commit -am "Build: update locked versions" && git push
+  Other machines: samebench sync
+  mise itself:    put the new version and checksums at the top of bin/samebench (see the docs)
+EOF
+}
+
+cmd_sync() {
+  local yes="" behind signers c stashed="" all_in=1 kind pkg ver
+  [ "${1:-}" = "-y" ] && yes=1
+  load_profile ""
+  say "Fetching the repository's latest state"
+  git -C "$SAMEBENCH_REPO" fetch -q || die "git fetch failed."
+  behind="$(git -C "$SAMEBENCH_REPO" rev-list --count HEAD..@{u})"
+  if [ "$behind" -gt 0 ]; then
+    git -C "$SAMEBENCH_REPO" --no-pager log --format='   %h %an: %s' HEAD..@{u}
+    git -C "$SAMEBENCH_REPO" --no-pager diff --stat HEAD..@{u}
+    signers="$STATE_DIR/allowed_signers"
+    if [ -s "$signers" ]; then
+      for c in $(git -C "$SAMEBENCH_REPO" rev-list HEAD..@{u}); do
+        git -C "$SAMEBENCH_REPO" -c gpg.ssh.allowedSignersFile="$signers" verify-commit "$c" >/dev/null 2>&1 ||
+          die "Commit $c is not signed by you, NOT taken. Inspect it: git -C $SAMEBENCH_REPO log --show-signature"
+      done
+      ok "All $behind commit(s) carry your signature."
+    else
+      warn "Signatures are not checked (set it up: docs, section Signed commits)."
+    fi
+    if [ -z "$yes" ]; then
+      echo "   Details: git -C $SAMEBENCH_REPO diff HEAD..@{u}"
+      ask "Take this state?" || die "Cancelled, nothing changed."
+    fi
+    # Put local security patches aside until the repository contains them
+    # shellcheck disable=SC2086
+    if [ -s "$STATE_DIR/local-patches" ] && [ -n "$(git -C "$SAMEBENCH_REPO" status --porcelain -- $LOCKFILES)" ]; then
+      # shellcheck disable=SC2086
+      git -C "$SAMEBENCH_REPO" stash push -q -m samebench-local-patches -- $LOCKFILES && stashed=1
+    fi
+    git -C "$SAMEBENCH_REPO" merge -q --ff-only @{u}
+    if [ -n "$stashed" ]; then
+      while IFS='|' read -r kind pkg ver; do
+        [ -n "$kind" ] || continue
+        patch_in_repo "$kind" "$pkg" "$ver" || all_in=""
+      done <"$STATE_DIR/local-patches"
+      if [ -n "$all_in" ]; then
+        git -C "$SAMEBENCH_REPO" stash drop -q
+        rm -f "$STATE_DIR/local-patches"
+        ok "The repository now contains your local security patches, switched back to its state."
+      else
+        git -C "$SAMEBENCH_REPO" stash pop -q || warn "The local patches could not be applied again, please check 'git -C $SAMEBENCH_REPO stash list'."
+        warn "The repository doesn't contain all local security patches yet, they stay active."
+      fi
+    fi
+  else
+    ok "The repository is up to date."
+  fi
+  exec "$SAMEBENCH_REPO/bin/samebench" apply -y
+}
+
+cmd_doctor() {
+  load_profile ""
+  echo "Profile:  $PROFILE   activation: $ACTIVATE"
+  echo "Modules:  $MODULES"
+  echo "Layout:   $LAYOUT   agent: ${AGENT_CMD:--}   Jupyter: $JUPYTER   Python downloads: $UV_PYTHON_DOWNLOADS"
+  echo "Updates:  check $CHECK   maintains lockfiles: $UPDATER   signature check: $([ -s "$STATE_DIR/allowed_signers" ] && echo on || echo off)"
+  [ -s "$STATE_DIR/local-patches" ] && warn "Deviates locally (security patches not in the repository yet): $(tr '\n' ' ' <"$STATE_DIR/local-patches")"
+  echo
+  eval "$(cd "$HOME" && mise env -s bash 2>/dev/null)" || true
+  local t
+  for t in mise nvim tmux lazygit rg fd tree-sitter uv ruff ty git "$AGENT_CMD"; do
+    [ -n "$t" ] || continue
+    if command -v "$t" >/dev/null 2>&1; then ok "$(printf '%-12s' "$t") $(command -v "$t")"
+    else warn "$(printf '%-12s' "$t") missing"; fi
+  done
+  t="$(mise_version)"
+  if [ -n "$t" ] && [ "$t" != "$MISE_VERSION" ]; then
+    warn "mise $t is installed, samebench pins $MISE_VERSION. Fix: samebench apply"
+  fi
+  if has_module python; then
+    if jupyter_installed; then ok "Jupyter tool  $JUPYTER_VENV"
+    elif [ "$JUPYTER" = no ]; then ok "Jupyter tool  turned off (JUPYTER=\"no\")"
+    else ok "Jupyter tool  not installed (installed on the first 'dev -j')"; fi
+  fi
+  [ -s "$MISE_LOCK" ] && ok "mise.lock present" || warn "mise.lock missing"
+  [ -s "$SAMEBENCH_REPO/config/nvim/lazy-lock.json" ] && ok "lazy-lock.json present" || warn "lazy-lock.json missing"
+  if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -n "${SSH_CONNECTION:-}" ]; then
+    warn "SSH agent forwarding is active, the coding agent could use your local keys. In ~/.ssh/config: ForwardAgent no"
+  fi
+  if grep -qi microsoft /proc/version 2>/dev/null; then
+    warn "WSL: Linux processes (the agent included) can see your Windows drives under /mnt/c and start Windows programs."
+    echo "     Limit this in /etc/wsl.conf ([automount] enabled=false, [interop] enabled=false), see the docs." >&2
+  fi
+}
+
+# Programs, data and caches that stay when only the setup is removed, one path per line.
+# mise keeps its cache in ~/Library/Caches on macOS and in the cache folder elsewhere.
+leftover_list() {
+  local state="${XDG_STATE_HOME:-$HOME/.local/state}" cache="${XDG_CACHE_HOME:-$HOME/.cache}"
+  printf '%s\n' "$DATA_DIR" "$CACHE_DIR" "$DATA_HOME/$NVIM_APP" "$state/$NVIM_APP" "$cache/$NVIM_APP" \
+    "$DATA_HOME/mise" "$state/mise" "$cache/mise" "$HOME/Library/Caches/mise" "$MISE_BIN"
+}
+
+# The way back: remove everything samebench set up
+cmd_remove() {
+  local yes="" pair dst f backup
+  [ "${1:-}" = "-y" ] && yes=1
+  say "This removes what samebench set up:"
+  echo "   · the line for samebench in ~/.zshrc and ~/.bashrc"
+  echo "   · git: include.path, '*.ipynb diff=samebench-ipynb', '.*.nb.py' (global config)"
+  echo "   · links: ~/.config/$NVIM_APP, ~/.config/mise/{config.toml,mise.lock,conf.d/*}, backups (.backup-*) come back"
+  echo "   · ~/.config/samebench (except local.sh) and running dev sessions (tmux -L samebench)"
+  echo "   Programs, data and caches (mise, plugins, Jupyter) are asked about separately afterwards."
+  if [ -z "$yes" ]; then ask "Remove it now?" || die "Cancelled, nothing changed."; fi
+  remove_line "$RC_LINE" "$HOME/.zshrc"
+  remove_line "$RC_LINE" "$HOME/.bashrc"
+  if git config --global --get-all include.path 2>/dev/null | grep -qxF "$STATE_DIR/gitconfig"; then
+    git config --global --fixed-value --unset-all include.path "$STATE_DIR/gitconfig" || true
+  fi
+  remove_line '*.ipynb diff=samebench-ipynb' "$(git_global_file core.attributesFile attributes)"
+  remove_line '.*.nb.py' "$(git_global_file core.excludesFile ignore)"
+  while IFS= read -r pair; do
+    dst="${pair#*|}"
+    unlink_own "$dst" "$SAMEBENCH_REPO/*" || true
+  done <<EOF
+$(link_list)
+EOF
+  for f in "$CONFIG_HOME/mise/conf.d"/*.toml; do
+    [ -L "$f" ] && case "$(readlink "$f")" in "$SAMEBENCH_REPO"/*) rm "$f" ;; esac
+  done
+  # the mise folders go only when nothing else is left in them
+  rmdir "$CONFIG_HOME/mise/conf.d" "$CONFIG_HOME/mise" 2>/dev/null || true
+  command -v tmux >/dev/null 2>&1 && tmux -L samebench kill-server 2>/dev/null || true
+  if [ -d "$STATE_DIR" ]; then
+    find "$STATE_DIR" -mindepth 1 -maxdepth 1 ! -name local.sh -exec rm -rf {} +
+    rmdir "$STATE_DIR" 2>/dev/null || true
+  fi
+  ok "Setup removed. Open a new shell."
+  echo
+  echo "   Still there (programs, data and caches):"
+  while IFS= read -r f; do
+    if [ -e "$f" ]; then echo "     $f"; fi
+  done <<EOF
+$(leftover_list)
+EOF
+  echo "     (Python versions and the package cache of uv live in ~/.local/share/uv and ~/.cache/uv,"
+  echo "      they belong to uv and stay)"
+  for f in "${XDG_CACHE_HOME:-$HOME/.cache}/tree-sitter" "${XDG_CACHE_HOME:-$HOME/.cache}/ty" \
+    "${XDG_CACHE_HOME:-$HOME/.cache}/sigstore-rust" "$HOME/Library/Caches/dev.sigstore.sigstore-rust"; do
+    if [ -e "$f" ]; then echo "     ($f is a small cache that other programs may share, it stays)"; fi
+  done
+  if [ -z "$yes" ] && ask "Delete these programs, data and caches as well?"; then
+    while IFS= read -r f; do
+      if [ -n "$f" ]; then rm -rf "$f"; fi
+    done <<EOF
+$(leftover_list)
+EOF
+    ok "Deleted."
+    backup="$(newest_backup "$MISE_BIN")"
+    if [ -n "$backup" ]; then
+      mv "$backup" "$MISE_BIN"
+      ok "$MISE_BIN: restored your previous mise (from $(basename "$backup"))"
+    fi
+  fi
+}
+
+case "${1:-}" in
+  plan) shift; cmd_plan "${1:-}" ;;
+  apply) shift; cmd_apply "$@" ;;
+  update) cmd_update ;;
+  sync) shift; cmd_sync "${1:-}" ;;
+  doctor) cmd_doctor ;;
+  jupyter) shift; cmd_jupyter "${1:-}" ;;
+  kernel) shift; cmd_kernel "${1:-}" ;;
+  remove) shift; cmd_remove "${1:-}" ;;
+  check) shift; cmd_check "$@" ;;
+  fix) shift; cmd_fix "$@" ;;
+  daily) shift; cmd_daily "${1:-}" ;;
+  check-system) check_system ;;
+  *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac
