@@ -1,0 +1,24 @@
+# lazygit: Liquid Glass colors, applies on Mac and Linux (via LG_CONFIG_FILE from env.sh).
+# With ICONS="nerd", nerd.yml is added as well (file icons).
+gui:
+  border: rounded
+  nerdFontsVersion: ""
+  theme:
+    activeBorderColor: ["#8ff0c8", bold]
+    inactiveBorderColor: ["#3b4261"]
+    searchingActiveBorderColor: ["#ffc27a", bold]
+    optionsTextColor: ["#82aaff"]
+    selectedLineBgColor: ["#2a2e45"]
+    inactiveViewSelectedLineBgColor: ["#222436"]
+    cherryPickedCommitFgColor: ["#14162a"]
+    cherryPickedCommitBgColor: ["#c3a6ff"]
+    markedBaseCommitFgColor: ["#14162a"]
+    markedBaseCommitBgColor: ["#ffc27a"]
+    unstagedChangesColor: ["#ff757f"]
+    defaultFgColor: [default]
+
+# Security: lazygit doesn't check for updates itself (updates only via mise.lock)
+update:
+  method: never
+
+disableStartupPopups: true

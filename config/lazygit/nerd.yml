@@ -1,0 +1,3 @@
+# Addition for profiles with ICONS="nerd": file icons in lazygit
+gui:
+  nerdFontsVersion: "3"
