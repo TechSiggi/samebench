@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="348" viewBox="0 0 1280 348" role="img" aria-labelledby="t d">
+  <title id="t">One kernel, two front ends</title>
+  <desc id="d">uv sync --frozen turns the pyproject.toml and uv.lock of a project into its .venv, and the kernel runs from that .venv. In the terminal, Neovim sends a cell with Space j j to the kernel console. JupyterLab in the browser is attached to the same kernel, so the variable df that was created from the editor is already there in the browser.</desc>
+  <defs>
+    <style>
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .win { fill: #14162a; stroke: #2a2e45; }
+      .act { fill: #16182a; stroke: #8ff0c8; }
+      .ina { fill: #1c1f33; stroke: #3b4261; }
+      .lbl { font-size: 13px; font-weight: 700; }
+      .sub { font-size: 11px; fill: #6b7089; }
+      .code { font-size: 13px; fill: #c8d3f5; }
+      .df { fill: #ffc27a; font-weight: 700; }
+      .key { fill: #2a2e45; stroke: #3b4261; }
+      .venv { fill: #14162a; stroke: #8ff0c8; stroke-opacity: 0.85; }
+      .tube { fill: #14162a; stroke: #2a2e45; }
+      .wire { fill: none; stroke: #8ff0c8; stroke-width: 2; stroke-linecap: round; }
+      .pipe { fill: none; stroke: #6b7089; stroke-width: 2; }
+      .plug { fill: #8ff0c8; stroke: #14162a; stroke-width: 2; }
+    </style>
+    <g id="dots"><circle cx="18" cy="16" r="4.5" fill="#ff757f"/><circle cx="34" cy="16" r="4.5" fill="#ffc27a"/><circle cx="50" cy="16" r="4.5" fill="#c3e88d"/></g>
+    <radialGradient id="glow">
+      <stop offset="0.5" stop-color="#8ff0c8" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#8ff0c8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Tubes that carry the wires across the page background, so they read on a light and a dark page.
+       Drawn first, the windows and cards sit on top of their ends. -->
+  <rect class="tube" x="480" y="275" width="60" height="8"/>
+  <rect class="tube" x="740" y="275" width="60" height="8"/>
+  <rect class="tube" x="636" y="78" width="8" height="112"/>
+  <path class="pipe" d="M640 78 V190"/>
+
+  <!-- Left: JupyterLab in the browser. Cell 2 was never run here, df is there anyway.
+       The kernel name in the corner is the display name that samebench kernel writes. -->
+  <g>
+    <rect class="win" width="490" height="348" rx="14"/>
+    <use href="#dots"/>
+    <rect x="120" y="7" width="250" height="18" rx="9" fill="#2a2e45"/>
+    <text class="mono" x="245" y="20" text-anchor="middle" font-size="10.5" fill="#6b7089">127.0.0.1:8888/lab</text>
+    <!-- side bar -->
+    <rect class="ina" x="12" y="34" width="38" height="304" rx="8"/>
+    <g fill="#6b7089"><rect x="23" y="50" width="16" height="12" rx="2"/><rect x="23" y="76" width="16" height="12" rx="2" opacity="0.6"/><circle cx="31" cy="108" r="6" opacity="0.6"/></g>
+    <!-- notebook -->
+    <rect class="ina" x="58" y="34" width="420" height="304" rx="8"/>
+    <text class="mono lbl" x="72" y="56" fill="#c8d3f5">analysis.ipynb</text>
+    <text class="mono" x="450" y="56" text-anchor="end" font-size="11" fill="#8ff0c8">Python (demo/.venv)</text>
+    <circle cx="460" cy="52" r="4" fill="none" stroke="#8ff0c8" stroke-width="1.5"/>
+    <rect x="58" y="68" width="420" height="1" fill="#3b4261"/>
+    <text class="mono sub" x="72" y="98">[ ]:</text>
+    <text class="mono" x="108" y="98" font-size="12" fill="#6b7089"><tspan class="df" opacity="0.75">df</tspan> = pd.read_csv("data.csv")</text>
+    <text class="mono sub" x="466" y="98" text-anchor="end">not run here</text>
+    <g fill="#c3a6ff" opacity="0.55"><rect x="108" y="124" width="150" height="8" rx="4"/><rect x="108" y="142" width="250" height="6" rx="3"/><rect x="108" y="156" width="190" height="6" rx="3"/></g>
+    <rect class="act" x="68" y="184" width="400" height="140" rx="6"/>
+    <text class="mono" x="80" y="210" font-size="12" fill="#8ff0c8">[4]:</text>
+    <text class="mono code" x="116" y="210"><tspan class="df">df</tspan>.head()</text>
+    <!-- the output, a small table -->
+    <g transform="translate(116 232)">
+      <g fill="#6b7089"><rect x="0" y="0" width="12" height="6" rx="3"/><rect x="36" y="0" width="40" height="6" rx="3"/><rect x="116" y="0" width="56" height="6" rx="3"/><rect x="204" y="0" width="44" height="6" rx="3"/></g>
+      <rect x="0" y="14" width="284" height="1" fill="#3b4261"/>
+      <g fill="#c8d3f5" opacity="0.8">
+        <rect x="36" y="24" width="52" height="6" rx="3"/><rect x="116" y="24" width="30" height="6" rx="3"/><rect x="204" y="24" width="24" height="6" rx="3"/>
+        <rect x="36" y="42" width="44" height="6" rx="3"/><rect x="116" y="42" width="36" height="6" rx="3"/><rect x="204" y="42" width="24" height="6" rx="3"/>
+        <rect x="36" y="60" width="58" height="6" rx="3"/><rect x="116" y="60" width="26" height="6" rx="3"/><rect x="204" y="60" width="24" height="6" rx="3"/>
+      </g>
+      <g fill="#6b7089" opacity="0.7"><rect x="0" y="24" width="8" height="6" rx="3"/><rect x="0" y="42" width="8" height="6" rx="3"/><rect x="0" y="60" width="8" height="6" rx="3"/></g>
+    </g>
+  </g>
+
+  <!-- Middle: the project. Its two files become the .venv, and the one kernel runs from there. -->
+  <g>
+    <rect class="win" x="530" y="0" width="220" height="88" rx="14"/>
+    <text class="mono lbl" x="546" y="27" fill="#c3a6ff">demo</text>
+    <text class="mono sub" x="588" y="27">your project</text>
+    <g class="mono" font-size="11">
+      <rect x="546" y="44" width="112" height="24" rx="12" fill="#2a2e45"/>
+      <text x="602" y="60" text-anchor="middle" fill="#c8d3f5">pyproject.toml</text>
+      <rect x="666" y="44" width="68" height="24" rx="12" fill="#2a2e45"/>
+      <text x="700" y="60" text-anchor="middle" fill="#c8d3f5">uv.lock</text>
+    </g>
+    <rect x="572" y="122" width="136" height="24" rx="12" fill="#2a2e45" stroke="#3b4261"/>
+    <text class="mono" x="640" y="138" text-anchor="middle" font-size="11.5" fill="#8ff0c8">uv sync --frozen</text>
+
+    <rect class="venv" x="530" y="180" width="220" height="168" rx="14"/>
+    <text class="mono lbl" x="546" y="205" fill="#8ff0c8">.venv</text>
+    <text class="mono sub" x="595" y="205">of the project</text>
+    <circle cx="640" cy="279" r="66" fill="url(#glow)"/>
+    <circle cx="640" cy="279" r="60" fill="none" stroke="#8ff0c8" stroke-opacity="0.18"/>
+    <circle cx="640" cy="279" r="50" fill="none" stroke="#8ff0c8" stroke-opacity="0.38">
+      <animate attributeName="stroke-opacity" dur="8s" repeatCount="indefinite"
+        values="0.38;0.38;1;0.38;0.38" keyTimes="0;0.22;0.25;0.32;1"/>
+    </circle>
+    <circle cx="640" cy="279" r="40" fill="#8ff0c8"/>
+    <text class="mono" x="640" y="277" text-anchor="middle" font-size="15" font-weight="700" fill="#14162a">kernel</text>
+    <rect x="626" y="284" width="28" height="15" rx="7.5" fill="#14162a"/>
+    <text class="mono df" x="640" y="295" text-anchor="middle" font-size="10">df</text>
+  </g>
+
+  <!-- Right: the terminal as dev -j builds it in bin/dev. Neovim sends the cell to the kernel console below it. -->
+  <g transform="translate(790 0)">
+    <rect class="win" width="490" height="348" rx="14"/>
+    <use href="#dots"/>
+    <text class="mono" x="245" y="21" text-anchor="middle" font-size="13" fill="#8ff0c8" font-weight="700">dev -j</text>
+    <rect class="act" x="12" y="34" width="466" height="202" rx="8"/>
+    <text class="mono lbl" x="26" y="56" fill="#8ff0c8">Neovim</text>
+    <text class="mono sub" x="88" y="56">analysis.ipynb</text>
+    <!-- the keys that send the cell -->
+    <g class="mono" font-size="11">
+      <text class="sub" x="356" y="56" text-anchor="end">runs the cell</text>
+      <rect class="key" x="366" y="42" width="46" height="20" rx="5"/>
+      <text x="389" y="56" text-anchor="middle" fill="#c8d3f5">Space</text>
+      <rect class="key" x="416" y="42" width="22" height="20" rx="5"/>
+      <text x="427" y="56" text-anchor="middle" fill="#c8d3f5">j</text>
+      <rect class="key" x="442" y="42" width="22" height="20" rx="5"/>
+      <text x="453" y="56" text-anchor="middle" fill="#c8d3f5">j</text>
+    </g>
+    <rect x="26" y="72" width="438" height="12" rx="3" fill="#2a2e45"/>
+    <text class="mono" x="34" y="81" font-size="8" fill="#8ff0c8" font-weight="700">Cell 2 · Code</text>
+    <rect x="104" y="77.5" width="304" height="1" fill="#8ff0c8" opacity="0.6"/>
+    <text class="mono" x="456" y="81" text-anchor="end" font-size="8" fill="#8ff0c8" font-weight="700">✓ 12:03</text>
+    <rect x="26" y="94" width="3" height="42" rx="1.5" fill="#8ff0c8"/>
+    <text class="mono code" x="38" y="108"><tspan fill="#c3a6ff">import</tspan> pandas <tspan fill="#c3a6ff">as</tspan> pd</text>
+    <text class="mono code" x="38" y="130"><tspan class="df">df</tspan> = pd.read_csv(<tspan fill="#c3e88d">"data.csv"</tspan>)</text>
+    <rect x="26" y="150" width="438" height="12" rx="3" fill="#2a2e45"/>
+    <text class="mono" x="34" y="159" font-size="8" fill="#8ff0c8" font-weight="700">Cell 3 · Markdown</text>
+    <rect x="122" y="155.5" width="334" height="1" fill="#8ff0c8" opacity="0.6"/>
+    <g fill="#c3a6ff" opacity="0.55"><rect x="38" y="176" width="210" height="6" rx="3"/><rect x="38" y="190" width="150" height="6" rx="3"/><rect x="38" y="204" width="180" height="6" rx="3"/></g>
+
+    <rect class="ina" x="12" y="244" width="229" height="70" rx="8"/>
+    <text class="mono lbl" x="26" y="266" fill="#c8d3f5">kernel</text>
+    <text class="mono sub" x="82" y="266">console</text>
+    <text class="mono" x="26" y="292" font-size="11.5" fill="#8ff0c8">In [3]: <tspan class="df">df</tspan><tspan fill="#c8d3f5"> = pd.read_csv(…)</tspan></text>
+    <rect class="ina" x="249" y="244" width="229" height="70" rx="8"/>
+    <text class="mono lbl" x="263" y="266" fill="#ffc27a">agent</text>
+    <g><rect x="263" y="280" width="14" height="6" rx="3" fill="#ffc27a"/><rect x="281" y="280" width="110" height="6" rx="3" fill="#c8d3f5" opacity="0.8"/>
+      <rect x="263" y="294" width="150" height="6" rx="3" fill="#6b7089" opacity="0.7"/></g>
+    <g class="mono" font-size="10"><rect x="12" y="324" width="58" height="16" rx="8" fill="#8ff0c8"/><text x="41" y="336" text-anchor="middle" fill="#14162a" font-weight="700">demo</text>
+      <text x="80" y="336" fill="#8ff0c8" font-weight="700">1:main</text><text x="126" y="336" fill="#ffc27a">2:jupyter</text><text x="190" y="336" fill="#6b7089">3:shell</text>
+      <text x="478" y="336" text-anchor="end" fill="#c3a6ff">⎇ main</text></g>
+  </g>
+
+  <!-- The two wires. Both end at the same kernel. -->
+  <path class="wire" d="M468 279 H580"/>
+  <path class="wire" d="M700 279 H802"/>
+  <circle class="plug" cx="468" cy="279" r="5"/>
+  <circle class="plug" cx="802" cy="279" r="5"/>
+
+  <!-- Every 8 seconds a cell travels from the console into the kernel, and its result on to the browser.
+       The light is invisible in the first frame, so a still image shows the plain picture. -->
+  <circle cy="279" r="3.5" fill="#eef1ff" opacity="0">
+    <animate attributeName="cx" dur="8s" repeatCount="indefinite"
+      values="802;802;700;700;580;468;468" keyTimes="0;0.1;0.22;0.3;0.3;0.42;1"/>
+    <animate attributeName="opacity" dur="8s" repeatCount="indefinite"
+      values="0;0;1;1;0;0;1;1;0;0" keyTimes="0;0.1;0.12;0.2;0.22;0.3;0.32;0.4;0.42;1"/>
+  </circle>
+</svg>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="-32 -32 64 64" role="img" aria-labelledby="t d">
+  <title id="t">samebench</title>
+  <desc id="d">Three identical terminal windows stacked behind each other, one for each machine.</desc>
+
+  <!-- The mark for light backgrounds. Every tile is the same window with an editor pane on top and two panes below.
+       The banners and the social preview draw the same tiles. -->
+  <g transform="translate(-27 -25)" opacity="0.45">
+    <rect width="30" height="24" rx="5" fill="#3b4261" stroke="#9aa2c7" stroke-opacity="0.6"/>
+    <rect x="4" y="5" width="22" height="9" rx="2" fill="none" stroke="#8ff0c8" stroke-width="1.6"/>
+    <rect x="4" y="16" width="10" height="4" rx="1.5" fill="#c3a6ff"/>
+    <rect x="16" y="16" width="10" height="4" rx="1.5" fill="#ffc27a"/>
+  </g>
+  <g transform="translate(-15 -13)" opacity="0.7">
+    <rect width="30" height="24" rx="5" fill="#3b4261" stroke="#9aa2c7" stroke-opacity="0.6"/>
+    <rect x="4" y="5" width="22" height="9" rx="2" fill="none" stroke="#8ff0c8" stroke-width="1.6"/>
+    <rect x="4" y="16" width="10" height="4" rx="1.5" fill="#c3a6ff"/>
+    <rect x="16" y="16" width="10" height="4" rx="1.5" fill="#ffc27a"/>
+  </g>
+  <g transform="translate(-3 -1)" opacity="1">
+    <rect width="30" height="24" rx="5" fill="#3b4261" stroke="#9aa2c7" stroke-opacity="0.6"/>
+    <rect x="4" y="5" width="22" height="9" rx="2" fill="none" stroke="#8ff0c8" stroke-width="1.6"/>
+    <rect x="4" y="16" width="10" height="4" rx="1.5" fill="#c3a6ff"/>
+    <rect x="16" y="16" width="10" height="4" rx="1.5" fill="#ffc27a"/>
+  </g>
+</svg>

@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="t d">
+  <title id="t">samebench</title>
+  <desc id="d">The same workbench on every machine, one secure terminal workspace for Mac, Linux and WSL with Neovim, tmux, lazygit and Jupyter in one layout.</desc>
+  <!-- The picture for link previews, 1280 by 640. It is built from the parts of banner-dark.svg and has no animation.
+       Everything that matters stays 80 px away from every edge, because previews get cropped. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f1122"/>
+      <stop offset="1" stop-color="#1b1e36"/>
+    </linearGradient>
+    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="70"/></filter>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.03"/>
+    </linearGradient>
+    <!-- What stays visible of a window when the next one sits 40 units further right and down in front of it -->
+    <clipPath id="behind">
+      <path clip-rule="evenodd" d="M-2 -2 H502 V270 H-2 Z M54 40 H542 V310 H40 V54 A14 14 0 0 1 54 40 Z"/>
+    </clipPath>
+    <!-- The empty window with its three panes, used for the two windows in the back -->
+    <g id="shell">
+      <rect width="500" height="268" rx="14" fill="#14162a" opacity="0.86"/>
+      <rect width="500" height="268" rx="14" fill="url(#glass)" stroke="#ffffff" stroke-opacity="0.16"/>
+      <circle cx="20" cy="18" r="5" fill="#ff757f"/><circle cx="38" cy="18" r="5" fill="#ffc27a"/><circle cx="56" cy="18" r="5" fill="#c3e88d"/>
+      <text x="250" y="22" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#6b7089">~/projects/demo</text>
+      <rect x="12" y="36" width="476" height="132" rx="8" fill="#16182a" stroke="#8ff0c8" stroke-opacity="0.85"/>
+      <rect x="24" y="62" width="92" height="96" rx="4" fill="#1e2136"/>
+      <rect x="12" y="176" width="234" height="58" rx="8" fill="#1c1f33" stroke="#3b4261"/>
+      <rect x="12" y="242" width="72" height="16" rx="8" fill="#8ff0c8"/>
+    </g>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <circle cx="1000" cy="130" r="220" fill="#8ff0c8" opacity="0.32" filter="url(#blur)"/>
+  <circle cx="1210" cy="590" r="190" fill="#c3a6ff" opacity="0.32" filter="url(#blur)"/>
+  <circle cx="90" cy="640" r="190" fill="#8ec5ff" opacity="0.16" filter="url(#blur)"/>
+
+  <!-- Logo mark: three identical windows stacked, the same workbench on every machine.
+       It is drawn on a 64 unit grid around its centre and shown here at 104 px. -->
+  <g transform="translate(133 240) scale(1.625)">
+    <g transform="translate(-27 -25)" opacity="0.45">
+      <rect width="30" height="24" rx="5" fill="#2a2e45" stroke="#6b7089" stroke-opacity="0.6"/>
+      <rect x="4" y="5" width="22" height="9" rx="2" fill="none" stroke="#8ff0c8" stroke-width="1.6"/>
+      <rect x="4" y="16" width="10" height="4" rx="1.5" fill="#c3a6ff"/>
+      <rect x="16" y="16" width="10" height="4" rx="1.5" fill="#ffc27a"/>
+    </g>
+    <g transform="translate(-15 -13)" opacity="0.7">
+      <rect width="30" height="24" rx="5" fill="#2a2e45" stroke="#6b7089" stroke-opacity="0.6"/>
+      <rect x="4" y="5" width="22" height="9" rx="2" fill="none" stroke="#8ff0c8" stroke-width="1.6"/>
+      <rect x="4" y="16" width="10" height="4" rx="1.5" fill="#c3a6ff"/>
+      <rect x="16" y="16" width="10" height="4" rx="1.5" fill="#ffc27a"/>
+    </g>
+    <g transform="translate(-3 -1)" opacity="1">
+      <rect width="30" height="24" rx="5" fill="#2a2e45" stroke="#6b7089" stroke-opacity="0.6"/>
+      <rect x="4" y="5" width="22" height="9" rx="2" fill="none" stroke="#8ff0c8" stroke-width="1.6"/>
+      <rect x="4" y="16" width="10" height="4" rx="1.5" fill="#c3a6ff"/>
+      <rect x="16" y="16" width="10" height="4" rx="1.5" fill="#ffc27a"/>
+    </g>
+  </g>
+
+  <!-- Title -->
+  <text x="210" y="268" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="80" font-weight="700" fill="#eef1ff" letter-spacing="-2">samebench</text>
+  <text x="88" y="342" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="30" font-weight="600" fill="#eef1ff">The same workbench on every machine.</text>
+  <text x="88" y="380" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="22" fill="#a9b1d6">One secure terminal workspace for Mac, Linux and WSL.</text>
+  <g transform="translate(88 410) scale(1.1)" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15">
+    <rect x="0" y="0" width="96" height="28" rx="14" fill="#8ff0c8"/>
+    <text x="48" y="19" text-anchor="middle" fill="#14162a" font-weight="700">neovim</text>
+    <rect x="106" y="0" width="72" height="28" rx="14" fill="#2a2e45"/>
+    <text x="142" y="19" text-anchor="middle" fill="#8ff0c8">tmux</text>
+    <rect x="188" y="0" width="88" height="28" rx="14" fill="#2a2e45"/>
+    <text x="232" y="19" text-anchor="middle" fill="#c3a6ff">lazygit</text>
+    <rect x="286" y="0" width="88" height="28" rx="14" fill="#2a2e45"/>
+    <text x="330" y="19" text-anchor="middle" fill="#ffc27a">jupyter</text>
+  </g>
+
+  <!-- The same window three times, one per machine. The two in the back show only what the next one leaves free. -->
+  <g transform="translate(678 164) scale(0.9)" opacity="0.45" clip-path="url(#behind)"><use href="#shell"/></g>
+  <g transform="translate(714 200) scale(0.9)" opacity="0.7" clip-path="url(#behind)"><use href="#shell"/></g>
+
+  <!-- Terminal window made of glass, in front -->
+  <g transform="translate(750 236) scale(0.9)">
+    <rect width="500" height="268" rx="14" fill="#14162a" opacity="0.86"/>
+    <rect width="500" height="268" rx="14" fill="url(#glass)" stroke="#ffffff" stroke-opacity="0.16"/>
+    <circle cx="20" cy="18" r="5" fill="#ff757f"/><circle cx="38" cy="18" r="5" fill="#ffc27a"/><circle cx="56" cy="18" r="5" fill="#c3e88d"/>
+    <text x="250" y="22" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#6b7089">~/projects/demo</text>
+
+    <!-- top: Neovim -->
+    <rect x="12" y="36" width="476" height="132" rx="8" fill="#16182a" stroke="#8ff0c8" stroke-opacity="0.85"/>
+    <text x="24" y="52" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#8ff0c8" font-weight="700">code · nvim</text>
+    <rect x="24" y="62" width="92" height="96" rx="4" fill="#1e2136"/>
+    <g fill="#6b7089"><rect x="32" y="72" width="54" height="5" rx="2"/><rect x="40" y="84" width="60" height="5" rx="2"/><rect x="40" y="96" width="46" height="5" rx="2"/><rect x="32" y="108" width="40" height="5" rx="2"/></g>
+    <rect x="128" y="64" width="348" height="12" rx="3" fill="#2a2e45"/>
+    <text x="136" y="73" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="8" fill="#8ff0c8" font-weight="700">Cell 2 · Code ─────────────────────────────── ✓ 12:03</text>
+    <g>
+      <rect x="132" y="86" width="28" height="6" rx="3" fill="#c3a6ff"/><rect x="164" y="86" width="70" height="6" rx="3" fill="#c8d3f5"/>
+      <rect x="132" y="100" width="22" height="6" rx="3" fill="#8ec5ff"/><rect x="158" y="100" width="120" height="6" rx="3" fill="#c3e88d"/>
+      <rect x="132" y="114" width="60" height="6" rx="3" fill="#c8d3f5"/><rect x="196" y="114" width="40" height="6" rx="3" fill="#ffc27a"/>
+      <rect x="132" y="128" width="200" height="6" rx="3" fill="#6b7089" opacity="0.7"/>
+      <rect x="132" y="142" width="36" height="6" rx="3" fill="#ff9ecf"/><rect x="172" y="142" width="90" height="6" rx="3" fill="#c8d3f5"/>
+    </g>
+
+    <!-- bottom left: terminal with a typed command -->
+    <rect x="12" y="176" width="234" height="58" rx="8" fill="#1c1f33" stroke="#3b4261"/>
+    <text x="24" y="192" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#6b7089">term</text>
+    <text x="24" y="216" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#8ff0c8">❯</text>
+    <text x="42" y="216" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" fill="#eef1ff">dev -j</text>
+    <rect x="98" y="204" width="8" height="15" fill="#8ff0c8"/>
+
+    <!-- bottom right: agent -->
+    <rect x="254" y="176" width="234" height="58" rx="8" fill="#1c1f33" stroke="#3b4261"/>
+    <text x="266" y="192" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#6b7089">agent</text>
+    <g><rect x="266" y="202" width="14" height="6" rx="3" fill="#ffc27a"/><rect x="284" y="202" width="120" height="6" rx="3" fill="#c8d3f5" opacity="0.8"/>
+      <rect x="266" y="216" width="160" height="6" rx="3" fill="#6b7089" opacity="0.7"/></g>
+
+    <!-- tmux status bar -->
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10">
+      <rect x="12" y="242" width="72" height="16" rx="8" fill="#8ff0c8"/>
+      <text x="48" y="254" text-anchor="middle" fill="#14162a" font-weight="700">demo</text>
+      <rect x="92" y="242" width="50" height="16" rx="8" fill="#2a2e45"/>
+      <text x="117" y="254" text-anchor="middle" fill="#8ff0c8" font-weight="700">1:main</text>
+      <text x="152" y="254" fill="#6b7089">2:jupyter</text>
+      <text x="214" y="254" fill="#6b7089">3:shell</text>
+      <text x="486" y="254" text-anchor="end" fill="#c3a6ff">samebench</text>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="370" viewBox="0 0 1280 370" role="img" aria-labelledby="t d">
+  <title id="t">Pinned lists and the questions before every install</title>
+  <desc id="d">Six pinned lists on the left, each wired to the question that comes before its install on the right. bin/samebench pins mise by version and SHA-256, mise.lock pins the tools with checksums, lazy-lock.json pins the plugins at exact commits. These three install after samebench apply has shown its plan and asked. envs/jupyter/uv.lock pins the Jupyter tool, the uv.lock of a project pins its packages, and uv holds the checksums for Python. dev -j asks about each of these three on its own.</desc>
+  <defs>
+    <style>
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .win { fill: #14162a; stroke: #2a2e45; }
+      .act { fill: #16182a; stroke: #8ff0c8; }
+      .ina { fill: #1c1f33; stroke: #3b4261; }
+      .ttl { font-size: 13px; font-weight: 700; fill: #8ff0c8; }
+      .name { font-size: 15px; font-weight: 700; }
+      .sub { font-size: 11.5px; fill: #6b7089; }
+      .tag { font-size: 11.5px; }
+      .cmd { font-size: 13px; fill: #c8d3f5; }
+      .ask { font-size: 15px; font-weight: 700; fill: #eef1ff; }
+      .pill { fill: #2a2e45; }
+      .hull { fill: none; stroke: #2a2e45; stroke-width: 8; }
+      .tube { fill: none; stroke: #14162a; stroke-width: 6; }
+      .wire { fill: none; stroke-width: 2; }
+      .plug { stroke: #14162a; stroke-width: 2; }
+    </style>
+    <g id="dots"><circle cx="18" cy="16" r="4.5" fill="#ff757f"/><circle cx="34" cy="16" r="4.5" fill="#ffc27a"/><circle cx="50" cy="16" r="4.5" fill="#c3e88d"/></g>
+    <!-- padlock, takes its colour from the color attribute of the use element -->
+    <g id="lock">
+      <path d="M3.5 9 V6 a4.5 4.5 0 0 1 9 0 V9" fill="none" stroke="currentColor" stroke-width="2"/>
+      <rect x="0" y="9" width="16" height="12" rx="3" fill="currentColor"/>
+      <circle cx="8" cy="15" r="1.6" fill="#14162a"/>
+    </g>
+    <!-- the six wires, from a list on the left to its question on the right -->
+    <path id="w1" d="M508 60.5 C640 60.5 640 158 772 158"/>
+    <path id="w2" d="M508 115.5 C640 115.5 640 166 772 166"/>
+    <path id="w3" d="M508 170.5 C640 170.5 640 174 772 174"/>
+    <path id="w4" d="M508 225.5 C640 225.5 640 254 772 254"/>
+    <path id="w5" d="M508 280.5 C640 280.5 640 296 772 296"/>
+    <path id="w6" d="M508 335.5 C640 335.5 640 338 772 338"/>
+  </defs>
+
+  <!-- Dark tubes around the wires, so they read on a light and a dark page. Drawn first, the windows cover their ends. -->
+  <g class="hull"><use href="#w1"/><use href="#w2"/><use href="#w3"/><use href="#w4"/><use href="#w5"/><use href="#w6"/></g>
+  <g class="tube"><use href="#w1"/><use href="#w2"/><use href="#w3"/><use href="#w4"/><use href="#w5"/><use href="#w6"/></g>
+
+  <!-- Left: the pinned lists, one row each -->
+  <g>
+    <rect class="win" width="520" height="370" rx="14"/>
+    <use href="#dots"/>
+    <text class="mono ttl" x="260" y="21" text-anchor="middle">comes from a pinned list</text>
+
+    <rect class="ina" x="12" y="36" width="496" height="49" rx="8"/>
+    <use href="#lock" x="28" y="50" color="#8ff0c8"/>
+    <text class="mono name" x="58" y="58" fill="#8ff0c8">bin/samebench</text>
+    <text class="mono sub" x="58" y="75">version and SHA-256</text>
+    <rect class="pill" x="444" y="49.5" width="52" height="22" rx="11"/>
+    <text class="mono tag" x="470" y="64.5" text-anchor="middle" fill="#8ff0c8">mise</text>
+
+    <rect class="ina" x="12" y="91" width="496" height="49" rx="8"/>
+    <use href="#lock" x="28" y="105" color="#8ec5ff"/>
+    <text class="mono name" x="58" y="113" fill="#8ec5ff">mise.lock</text>
+    <text class="mono sub" x="58" y="130">checksums per platform</text>
+    <rect class="pill" x="438" y="104.5" width="58" height="22" rx="11"/>
+    <text class="mono tag" x="467" y="119.5" text-anchor="middle" fill="#8ec5ff">tools</text>
+
+    <rect class="ina" x="12" y="146" width="496" height="49" rx="8"/>
+    <use href="#lock" x="28" y="160" color="#c3a6ff"/>
+    <text class="mono name" x="58" y="168" fill="#c3a6ff">lazy-lock.json</text>
+    <text class="mono sub" x="58" y="185">exact commits</text>
+    <rect class="pill" x="424" y="159.5" width="72" height="22" rx="11"/>
+    <text class="mono tag" x="460" y="174.5" text-anchor="middle" fill="#c3a6ff">plugins</text>
+
+    <rect class="ina" x="12" y="201" width="496" height="49" rx="8"/>
+    <use href="#lock" x="28" y="215" color="#ffc27a"/>
+    <text class="mono name" x="58" y="223" fill="#ffc27a">envs/jupyter/uv.lock</text>
+    <text class="mono sub" x="58" y="240">a hash for every package</text>
+    <rect class="pill" x="388" y="214.5" width="108" height="22" rx="11"/>
+    <text class="mono tag" x="442" y="229.5" text-anchor="middle" fill="#ffc27a">Jupyter tool</text>
+
+    <rect class="ina" x="12" y="256" width="496" height="49" rx="8"/>
+    <use href="#lock" x="28" y="270" color="#ff9ecf"/>
+    <text class="mono name" x="58" y="278" fill="#ff9ecf">the project's uv.lock</text>
+    <text class="mono sub" x="58" y="295">exactly as locked</text>
+    <rect class="pill" x="360" y="269.5" width="136" height="22" rx="11"/>
+    <text class="mono tag" x="428" y="284.5" text-anchor="middle" fill="#ff9ecf">project packages</text>
+
+    <rect class="ina" x="12" y="311" width="496" height="49" rx="8"/>
+    <use href="#lock" x="28" y="325" color="#c3e88d"/>
+    <text class="mono name" x="58" y="333" fill="#c3e88d">uv</text>
+    <text class="mono sub" x="58" y="350">checksums stored in uv</text>
+    <rect class="pill" x="430" y="324.5" width="66" height="22" rx="11"/>
+    <text class="mono tag" x="463" y="339.5" text-anchor="middle" fill="#c3e88d">Python</text>
+  </g>
+
+  <!-- Right: the terminal. The questions are quoted from bin/samebench and bin/dev. -->
+  <g transform="translate(760 0)">
+    <rect class="win" width="520" height="370" rx="14"/>
+    <use href="#dots"/>
+    <text class="mono ttl" x="260" y="21" text-anchor="middle">and asks before it installs</text>
+
+    <rect class="act" x="12" y="34" width="496" height="156" rx="8"/>
+    <text class="mono cmd" x="28" y="58"><tspan fill="#8ff0c8">❯</tspan> samebench apply mac</text>
+    <text class="mono" x="28" y="82" font-size="11.5" fill="#c8d3f5"><tspan fill="#8ec5ff" font-weight="700">==&gt;</tspan> Plan for profile "mac" … NOTHING is changed yet</text>
+    <!-- the plan, one line per program -->
+    <g class="mono" font-size="10" fill="#6b7089"><text x="38" y="105">↓</text><text x="38" y="119">↓</text><text x="38" y="133">↓</text><text x="38" y="147">↓</text></g>
+    <g>
+      <rect x="58" y="98" width="34" height="6" rx="3" fill="#8ff0c8"/><rect x="150" y="98" width="52" height="6" rx="3" fill="#6b7089" opacity="0.7"/><rect x="222" y="98" width="96" height="6" rx="3" fill="#6b7089" opacity="0.7"/>
+      <rect x="58" y="112" width="50" height="6" rx="3" fill="#8ec5ff"/><rect x="150" y="112" width="40" height="6" rx="3" fill="#6b7089" opacity="0.7"/><rect x="222" y="112" width="60" height="6" rx="3" fill="#6b7089" opacity="0.7"/>
+      <rect x="58" y="126" width="34" height="6" rx="3" fill="#8ec5ff"/><rect x="150" y="126" width="34" height="6" rx="3" fill="#6b7089" opacity="0.7"/><rect x="222" y="126" width="60" height="6" rx="3" fill="#6b7089" opacity="0.7"/>
+      <rect x="58" y="140" width="66" height="6" rx="3" fill="#c3a6ff"/><rect x="150" y="140" width="130" height="6" rx="3" fill="#6b7089" opacity="0.7"/>
+    </g>
+    <text class="mono ask" x="28" y="171">Set it up like this? [y/N] <tspan fill="#8ff0c8">█<animate attributeName="fill-opacity" dur="1s" repeatCount="indefinite" calcMode="discrete" values="1;0"/></tspan></text>
+
+    <rect class="ina" x="12" y="198" width="496" height="162" rx="8"/>
+    <text class="mono cmd" x="28" y="221"><tspan fill="#8ff0c8">❯</tspan> dev -j</text>
+    <text class="mono sub" x="28" y="242">The Jupyter tool is not installed yet.</text>
+    <text class="mono ask" x="28" y="259">Install it now? [y/N]</text>
+    <text class="mono sub" x="28" y="284">This project wants 14 packages in its .venv …</text>
+    <text class="mono ask" x="28" y="301">Install them? [y/N]</text>
+    <text class="mono sub" x="28" y="326">The project needs Python &gt;=3.12, which is missing here.</text>
+    <text class="mono ask" x="28" y="343">Install it with uv? [y/N]</text>
+  </g>
+
+  <!-- The wires and their plugs, on top of the windows -->
+  <g class="wire">
+    <use href="#w1" stroke="#8ff0c8"/><use href="#w2" stroke="#8ec5ff"/><use href="#w3" stroke="#c3a6ff"/>
+    <use href="#w4" stroke="#ffc27a"/><use href="#w5" stroke="#ff9ecf"/><use href="#w6" stroke="#c3e88d"/>
+  </g>
+  <g class="plug">
+    <circle cx="508" cy="60.5" r="5" fill="#8ff0c8"/><circle cx="772" cy="158" r="4" fill="#8ff0c8"/>
+    <circle cx="508" cy="115.5" r="5" fill="#8ec5ff"/><circle cx="772" cy="166" r="4" fill="#8ec5ff"/>
+    <circle cx="508" cy="170.5" r="5" fill="#c3a6ff"/><circle cx="772" cy="174" r="4" fill="#c3a6ff"/>
+    <circle cx="508" cy="225.5" r="5" fill="#ffc27a"/><circle cx="772" cy="254" r="5" fill="#ffc27a"/>
+    <circle cx="508" cy="280.5" r="5" fill="#ff9ecf"/><circle cx="772" cy="296" r="5" fill="#ff9ecf"/>
+    <circle cx="508" cy="335.5" r="5" fill="#c3e88d"/><circle cx="772" cy="338" r="5" fill="#c3e88d"/>
+  </g>
+</svg>
