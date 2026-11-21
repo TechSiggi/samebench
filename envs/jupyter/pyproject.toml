@@ -1,0 +1,31 @@
+# Jupyter TOOL for `dev -j`, managed by `samebench`.
+#
+# Contains only Jupyter itself, NO project packages (pandas, numpy, …).
+# Those always come from the respective project (`uv sync` → .venv), and the
+# kernel runs with the Python of that .venv.
+#
+# It is installed only on the first `dev -j` (after asking), exactly as in
+# uv.lock (hashes), into ~/.local/share/samebench/jupyter-venv.
+# New versions only via `samebench update` (at least 7 days old).
+
+[project]
+name = "samebench-jupyter"
+version = "0.0.0"
+requires-python = ">=3.10"
+dependencies = [
+  "jupyterlab>=4.4",   # notebook in the browser (plots, sharing)
+  "jupyter-console",   # kernel console in the tmux pane, attached to the same kernel
+  "jupytext",          # notebook <-> Python cells (# %%), also for git diff
+  "ipykernel",         # kernel, in case the project doesn't bring its own
+]
+
+[dependency-groups]
+# Only ipykernel and its dependencies, exported as a list with hashes
+# and, for projects without ipykernel, loaded in just for the kernel (the project
+# itself stays unchanged).
+kernel = ["ipykernel"]
+
+[tool.uv]
+package = false
+exclude-newer = "7 days"
+default-groups = []

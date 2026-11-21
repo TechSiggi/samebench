@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# jlab - open the running JupyterLab (from `dev -j`) in the browser, token included
+#
+#   jlab [folder]         print a link (Ctrl/Cmd+click) and open the browser where
+#                         possible: Mac, WSL (Windows browser), Linux desktop.
+#                         Over SSH (for example a remote VM) nothing opens by itself,
+#                         click the link, SSH forwards 127.0.0.1:8888-8890.
+#   jlab --url [folder]   only print the address (for example for the PowerShell function)
+#
+# [folder] picks the right server when several dev -j sessions run (default:
+# the current folder). The clipboard is never touched.
+#
+# In tmux: Prefix + o
+set -euo pipefail
+
+only_url=""
+if [ "${1:-}" = "--url" ]; then only_url=1; shift; fi
+# Folder: a path (relative or absolute) or just the name of a dev -j project (for example "demo")
+want="${1:-}"
+where="$(cd "${want:-.}" 2>/dev/null && pwd -P || pwd -P)"
+
+venv="${SAMEBENCH_JUPYTER_VENV:-${XDG_DATA_HOME:-$HOME/.local/share}/samebench/jupyter-venv}"
+[ -x "$venv/bin/jupyter" ] || { echo "The Jupyter tool is missing, start the session with 'dev -r -j'." >&2; exit 1; }
+
+# Pick a server, preferring the one whose folder contains the requested folder
+url="$("$venv/bin/jupyter" server list --json 2>/dev/null | "$venv/bin/python" -I -c '
+import json, os, sys
+cwd, name = os.path.realpath(sys.argv[1]), sys.argv[2]
+servers = [json.loads(l) for l in sys.stdin if l.strip().startswith("{")]
+def root(s):
+    return os.path.realpath(s.get("root_dir", "/")).rstrip("/")
+if name and "/" not in name:
+    servers.sort(key=lambda s: os.path.basename(root(s)) != name)
+servers.sort(key=lambda s: not (cwd + "/").startswith(root(s) + "/"))
+if servers:
+    s = servers[0]
+    print(s["url"].rstrip("/") + "/lab?token=" + s.get("token", ""))
+' "$where" "$want")"
+
+if [ -z "$url" ]; then
+  echo "No JupyterLab found. Is it running? (dev -j → window 'jupyter')" >&2
+  exit 1
+fi
+
+if [ -n "$only_url" ]; then
+  printf '%s\n' "$url"
+  exit 0
+fi
+
+# 1) Clickable link (OSC 8, works in Windows Terminal, Ghostty, iTerm2, ..., tmux passes it on).
+#    Without a terminal (for example Ctrl+b o) just the address.
+if [ -t 1 ]; then
+  printf 'JupyterLab: \033]8;;%s\033\\%s\033]8;;\033\\\n' "$url" "$url"
+  echo "            (Ctrl+click or Cmd+click opens the browser)"
+else
+  echo "JupyterLab: $url"
+fi
+
+# 2) Open the browser where this machine can, with built-in tools only
+opened=""
+if [ "$(uname -s)" = "Darwin" ]; then
+  open "$url" && opened=1
+elif grep -qi microsoft /proc/version 2>/dev/null && command -v explorer.exe >/dev/null 2>&1; then
+  explorer.exe "$url" || true # explorer.exe returns an error code even on success
+  opened=1
+elif [ -z "${SSH_CONNECTION:-}" ] && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && command -v xdg-open >/dev/null 2>&1; then
+  xdg-open "$url" >/dev/null 2>&1 && opened=1
+fi
+
+if [ -n "$opened" ]; then
+  echo "Browser opened."
+elif [ -n "${SSH_CONNECTION:-}" ]; then
+  port="$(printf '%s' "$url" | sed -n 's#^https\{0,1\}://[^:/]*:\([0-9]*\).*#\1#p')"
+  case "$port" in
+    8888 | 8889 | 8890) echo "Over SSH: click the link (port $port is forwarded by your SSH config)." ;;
+    *) echo "Note: port $port is not forwarded by the SSH config (8888-8890), stop another dev -j session (dev -s, dev -k)." ;;
+  esac
+fi

@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+"""Convert a notebook to Python cells (# %%) and back.
+
+Usage (Neovim and git do this, with the Python of the Jupyter tool):
+    <jupyter-venv>/bin/python -I nb-convert to-py <notebook.ipynb> <cells.py or ->
+    <jupyter-venv>/bin/python -I nb-convert to-ipynb <cells.py> <notebook.ipynb>
+
+`to-ipynb` keeps the outputs of a notebook that already exists.
+
+This calls the jupytext library and not the `jupytext` command on purpose. The
+command looks for a configuration file next to the notebook, and a
+`jupytext.py` it finds there runs as Python. Opening or diffing a notebook
+would then execute code from the repository. The library reads no configuration.
+"""
+
+import os
+import sys
+
+import jupytext
+from jupytext.combine import combine_inputs_with_outputs
+
+CELLS = "py:percent"
+
+
+def main(direction, source, target):
+    if direction == "to-py":
+        jupytext.write(jupytext.read(source, fmt="ipynb"), target, fmt=CELLS)
+    elif direction == "to-ipynb":
+        notebook = jupytext.read(source, fmt=CELLS)
+        if os.path.isfile(target):
+            notebook = combine_inputs_with_outputs(notebook, jupytext.read(target, fmt="ipynb"), fmt=CELLS)
+        jupytext.write(notebook, target, fmt="ipynb")
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        sys.exit(__doc__)
+    main(*sys.argv[1:])

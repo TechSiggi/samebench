@@ -1,0 +1,9 @@
+#!/bin/sh
+# Git helper for notebook diffs (set up by `samebench apply`, global git config only).
+# Shows an .ipynb as Python code with cells (# %%), without outputs, easy to read.
+# If the Jupyter tool is not installed (yet), the plain content is shown instead.
+python="${SAMEBENCH_JUPYTER_VENV:-${XDG_DATA_HOME:-$HOME/.local/share}/samebench/jupyter-venv}/bin/python"
+if [ -x "$python" ]; then
+  exec "$python" -I -W ignore "$(dirname "$0")/nb-convert" to-py "$1" -
+fi
+exec cat "$1"
