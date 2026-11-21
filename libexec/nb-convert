@@ -9,7 +9,7 @@ Usage (Neovim and git do this, with the Python of the Jupyter tool):
 
 This calls the jupytext library and not the `jupytext` command on purpose. The
 command looks for a configuration file next to the notebook, and a
-`jupytext.py` it finds there runs as Python. Opening or diffing a notebook
+`.jupytext.py` it finds there runs as Python. Opening or diffing a notebook
 would then execute code from the repository. The library reads no configuration.
 """
 

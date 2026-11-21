@@ -91,7 +91,13 @@ Neovim runs with `NVIM_APPNAME=samebench-nvim`, which gives it its own configura
 Jupyter looks for kernel definitions in the folders listed in `JUPYTER_PATH` before its built in ones. `samebench kernel`
 writes a definition named `python3` whose command is the Python of the project's `.venv`, in a folder that belongs
 to that project, and `dev` sets `JUPYTER_PATH` for the session. JupyterLab, the console and `Space j k` therefore
-all start the same kernel without anyone touching the project.
+all start the same kernel without anyone touching the project. A project without a `.venv` gets the same
+definition with the Python of the Jupyter tool.
+
+The definition does not start the kernel with the usual `python -m ipykernel_launcher`. That form searches the
+kernel's working folder first, which is the folder of the notebook, so an `ipykernel_launcher.py` lying there would
+run as soon as the notebook is opened. The command takes the working folder off the import path before it loads
+the kernel. IPython puts it back once the kernel is up, so a notebook still imports the modules next to it.
 
 When the project has no `ipykernel`, `samebench` exports `ipykernel` and its dependencies with hashes from
 `envs/jupyter/uv.lock`, installs them with `uv pip install` into a small overlay environment built on the project's
@@ -106,7 +112,7 @@ opened, so only its printable ASCII characters reach your terminal.
 ## Converting notebooks
 
 Neovim and git never call the `jupytext` command. That command searches the notebook's folder for a configuration
-file and runs a `jupytext.py` it finds there as Python, which would let a repository execute code as soon as you
+file and runs a `.jupytext.py` it finds there as Python, which would let a repository execute code as soon as you
 open or diff one of its notebooks. `libexec/nb-convert` calls the jupytext library instead, which reads no
 configuration, and it runs with the Python of the Jupyter tool in isolated mode (`-I`). The result is the same text
 the command produces, and writing back keeps the outputs of the existing notebook.

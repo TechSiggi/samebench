@@ -28,7 +28,8 @@ dev -j
 3. **The kernel.** For this session only, the kernel called `python3` runs with the Python of the project's
    `.venv`. Notebooks that ask for `python3`, which is nearly all of them, just work. If the project doesn't bring
    `ipykernel`, it is added for the kernel alone from a locked list with verified hashes, and the project stays
-   untouched. The kernel talks over local sockets instead of TCP.
+   untouched. A project without a `.venv` gets a kernel with the Python of the Jupyter tool, which only knows the
+   basic Jupyter packages. The kernel talks over local sockets instead of TCP.
 4. **JupyterLab.** It starts in the second tmux window and only listens on `127.0.0.1`, with a token and without
    the terminal feature in the browser.
 

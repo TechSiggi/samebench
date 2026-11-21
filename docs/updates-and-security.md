@@ -70,8 +70,10 @@ A cloned repository should not be able to run anything just because you look at 
 run its code yourself, for example a notebook cell.
 
 - A `.venv` that the repository ships, meaning git tracks files in it, is never activated and never becomes a kernel.
+- A kernel starts without the notebook's folder on its import path, so a file in the repository can't take the
+  place of the kernel's own start module. The folder becomes importable once the kernel is up.
 - Notebooks are converted for Neovim and for `git diff` without reading any configuration from the repository. The
-  `jupytext` command would run a `jupytext.py` it finds next to a notebook, so the setup calls the library instead.
+  `jupytext` command would run a `.jupytext.py` it finds next to a notebook, so the setup calls the library instead.
 - Neovim ignores modelines and project plugin files, and folder names are escaped before tmux hands them to a shell.
 - Project packages are only installed by `dev -j`, exactly as the project's `uv.lock` says, and only after you
   have approved that lockfile. `dev -j` shows how many packages it holds and names every package that does not

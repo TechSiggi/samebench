@@ -320,6 +320,7 @@ function M.connect()
   local target = vim.b.samebench_notebook or vim.api.nvim_buf_get_name(0)
   local cmd = table.concat({
     vim.fn.shellescape(python),
+    "-I",
     vim.fn.shellescape(REPO .. "/libexec/jupyter-attach"),
     vim.fn.shellescape(target),
   }, " ")

@@ -2,7 +2,7 @@
 """Connect a kernel console to a notebook's kernel.
 
 Usage (Neovim does this with <Space>jk):
-    <jupyter-venv>/bin/python jupyter-attach <file>
+    <jupyter-venv>/bin/python -I jupyter-attach <file>
 
 * If <file> is an .ipynb and a local JupyterLab server whose folder contains
   the notebook is running, the notebook's session is used, or created. When

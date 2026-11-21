@@ -494,18 +494,22 @@ cmd_jupyter() {
 }
 
 # cmd_kernel <folder>: write a "python3" kernel definition for the project's
-# .venv and print the folder for JUPYTER_PATH (nothing without a .venv).
+# .venv and print the folder for JUPYTER_PATH. Without a .venv the kernel runs
+# with the Python of the Jupyter tool.
 cmd_kernel() {
-  local dir="${1:?folder missing}" venv py name kroot kdir pyver overlay site=""
+  local dir="${1:?folder missing}" venv py name label start kroot kdir pyver overlay site=""
   dir="$(cd "$dir" && pwd -P)"
   venv="$dir/.venv"
   py="$venv/bin/python"
-  [ -x "$py" ] || return 0
   jupyter_installed || die "The Jupyter tool is missing, run 'samebench jupyter'."
   load_profile ""
   mise_env
   name="$(basename "$dir")"
-  if ! ls -d "$venv"/lib/python*/site-packages/ipykernel >/dev/null 2>&1; then
+  label="Python ($name/.venv)"
+  if [ ! -x "$py" ]; then
+    py="$JUPYTER_VENV/bin/python"
+    label="Python (Jupyter tool)"
+  elif ! ls -d "$venv"/lib/python*/site-packages/ipykernel >/dev/null 2>&1; then
     # The project has no ipykernel: install it (pinned versions, hashes verified)
     # into a small separate environment, the project itself stays unchanged.
     [ -s "$KERNEL_REQS" ] || sync_jupyter >/dev/null
@@ -525,10 +529,15 @@ cmd_kernel() {
   kdir="$kroot/kernels/python3"
   mkdir -p "$kdir"
   json_str() { printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
+  # The usual "python -m ipykernel_launcher" looks in the kernel's working folder first, so
+  # an ipykernel_launcher.py next to a notebook would run as soon as that notebook is opened.
+  # This start takes the working folder off the import path before it loads anything.
+  # IPython puts it back after the standard library, so notebooks still import local modules.
+  start='import sys; sys.path[:] = [p for p in sys.path if p]; from ipykernel import kernelapp; kernelapp.launch_new_instance()'
   {
-    printf '{\n  "argv": [%s, "-m", "ipykernel_launcher", "-f", "{connection_file}"],\n' "$(json_str "$py")"
+    printf '{\n  "argv": [%s, "-c", %s, "-f", "{connection_file}"],\n' "$(json_str "$py")" "$(json_str "$start")"
     if [ -n "$site" ]; then printf '  "env": {"PYTHONPATH": %s},\n' "$(json_str "$site")"; fi
-    printf '  "display_name": %s,\n  "language": "python"\n}\n' "$(json_str "Python ($name/.venv)")"
+    printf '  "display_name": %s,\n  "language": "python"\n}\n' "$(json_str "$label")"
   } >"$kdir/kernel.json"
   printf '%s\n' "$kroot"
 }
