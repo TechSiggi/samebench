@@ -26,6 +26,9 @@ installs exactly that, after it has asked you.
 mise is the one program `samebench` downloads itself. It compares the download with the SHA-256 for your platform and
 stops without installing anything when the two differ.
 
+When a lockfile is missing or empty, `samebench apply` stops as well, because installing without it would mean
+taking whatever version is newest. Only the machine with `UPDATER="yes"` goes on and creates a new one.
+
 The plugin list gets the same care. On a new machine LazyVim is fetched at its locked commit before lazy.nvim
 starts, so that one round installs every plugin at its locked commit. lazy.nvim also rewrites `lazy-lock.json`
 whenever it installs something, so `samebench apply` puts the pinned list back if that changed it and stops when a

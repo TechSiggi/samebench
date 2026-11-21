@@ -347,9 +347,17 @@ EOF
 }
 
 # ------------------------------------------------------------- Installs ---
+# no_lockfile <name>: installing without a lockfile means installing unpinned versions, so
+# only the machine that maintains the lockfiles goes on and creates a new one
+no_lockfile() {
+  [ "$UPDATER" = yes ] ||
+    die "$1 is missing or empty, nothing installed. Restore it with git. Only the machine with UPDATER=\"yes\" creates a new one."
+}
+
 install_tools() {
   need_mise
   if [ ! -s "$MISE_LOCK" ]; then
+    no_lockfile mise.lock
     warn "No mise.lock yet, creating it now (once, commit it afterwards!)."
     lock_tools
   fi
@@ -433,6 +441,7 @@ install_nvim_plugins() {
       die "The Neovim plugins do NOT match lazy-lock.json (first one: $bad). The lockfile is unchanged, run 'samebench apply' again."
     ok "Plugins match the lockfile"
   else
+    no_lockfile lazy-lock.json
     warn "No lazy-lock.json yet, installing plugins fresh (commit it afterwards!)."
     nvim --headless "+Lazy! sync" +qa
   fi
@@ -755,6 +764,8 @@ cmd_check() {
 # cmd_fix <package> <version>: lift one tool (mise) or Jupyter package
 cmd_fix() {
   local pkg="${1:?package missing}" version="${2:?version missing}" kind="" tool="" line
+  # The version can come from OSV.dev, so it only passes with the characters versions are made of
+  case "$version" in *[!A-Za-z0-9.+_-]*) die "The version for $pkg contains characters that no version has, nothing changed." ;; esac
   load_profile ""
   need_mise
   mise_env

@@ -148,7 +148,8 @@ any answer is missing or broken, the script exits with status 2 and leaves the p
 
 `samebench fix` lifts a tool with `mise lock <tool>@<version>` and a Jupyter package with
 `uv lock --upgrade-package <name>==<version> --exclude-newer-package <name>=false`. Both keep checksums and hashes
-mandatory.
+mandatory. The version usually comes from the advisory, so it only passes when it consists of letters, digits and
+the characters `.`, `+`, `_` and `-`.
 
 ## Syncing safely
 
