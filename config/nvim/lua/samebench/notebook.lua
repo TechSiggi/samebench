@@ -595,7 +595,9 @@ function M.setup()
     pattern = "python",
     callback = function(ev)
       buffer_keymaps(ev.buf)
-      -- Keep the cell bars up to date
+      -- Keep the cell bars up to date. FileType fires again on every reload of the buffer,
+      -- so the autocommand of the last time goes first.
+      vim.api.nvim_clear_autocmds({ group = group, buffer = ev.buf })
       vim.api.nvim_create_autocmd({ "BufWinEnter", "TextChanged", "TextChangedI", "InsertLeave" }, {
         group = group,
         buffer = ev.buf,
