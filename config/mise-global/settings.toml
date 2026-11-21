@@ -1,0 +1,30 @@
+# Global mise configuration, linked to ~/.config/mise/config.toml
+# The tools themselves are listed in modules/<module>/tools.toml and are linked by
+# `samebench apply` into ~/.config/mise/conf.d/ (active modules only).
+
+[settings]
+# Maintain a lockfile with exact versions, download URLs and checksums …
+lockfile = true
+# … and install ONLY what is in the lockfile. New versions get into the
+# lockfile exclusively through `samebench update` (on update day).
+locked = true
+
+# Only take versions once they are at least 7 days old.
+# Freshly hijacked releases are usually discovered within a few days.
+minimum_release_age = "7d"
+
+# Paranoid mode: project configurations (e.g. .nvmrc, mise.toml in other people's
+# repos) need explicit approval, provenance (signatures,
+# attestations) is verified again on every install.
+paranoid = true
+
+# No plugin backends that run third-party shell scripts.
+disable_backends = ["asdf", "vfox"]
+
+# Don't install anything automatically when a command is missing.
+auto_install = false
+not_found_auto_install = false
+
+# mise itself only changes through samebench (pinned version and checksum). Without this,
+# mise asks mise.jdx.dev for newer versions and suggests "mise self-update".
+disable_update_warning = true

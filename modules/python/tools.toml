@@ -1,0 +1,8 @@
+# Module "python", everything from Astral (same publisher as uv).
+# The Jupyter packages (jupyterlab, jupytext, …) do NOT go here but into
+# their own environment envs/jupyter (uv.lock with hashes).
+
+[tools]
+"aqua:astral-sh/uv" = "latest"   # Python packages and environments
+"aqua:astral-sh/ruff" = "latest" # linter + formatter (also as a language server)
+"aqua:astral-sh/ty" = "latest"   # type checking + autocomplete (language server, still 0.0.x)

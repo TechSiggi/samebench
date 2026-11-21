@@ -1,0 +1,13 @@
+# Module "core", on every machine.
+# All tools come through the aqua backend: the projects' official release downloads,
+# verified by mise against checksums and (where available) signatures.
+# The exact versions are in config/mise-global/mise.lock.
+# Major versions are pinned here on purpose; changing one is a deliberate decision.
+
+[tools]
+"aqua:neovim/neovim" = "0.12"           # editor (not "latest": that would match "nightly")
+"aqua:tmux/tmux-builds" = "3"           # terminal multiplexer (official tmux builds)
+"aqua:jesseduffield/lazygit" = "latest" # Git UI in the terminal
+"aqua:BurntSushi/ripgrep" = "15"        # fast search (for Neovim)
+"aqua:sharkdp/fd" = "10"                # fast file search (for Neovim)
+"aqua:tree-sitter/tree-sitter" = "0.27" # builds syntax parsers for Neovim
