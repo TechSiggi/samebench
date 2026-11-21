@@ -67,13 +67,15 @@ export UV_PYTHON_DOWNLOADS="${SAMEBENCH_UV_PYTHON_DOWNLOADS:-manual}"
 SOCK="${SAMEBENCH_TMUX_SOCKET:-samebench}"
 tmux() { command tmux -L "$SOCK" -f "$SAMEBENCH_REPO/config/tmux/tmux.conf" "$@"; }
 
+# exec starts the tmux program itself and never the function above. It must not go
+# through "command": that is a shell builtin, and only some systems also ship it as a program.
 attach() {
   # Already inside a dev session (same server): just switch
   if [ -n "${TMUX:-}" ] && [ "$(basename "${TMUX%%,*}")" = "$SOCK" ]; then
-    exec command tmux -L "$SOCK" switch-client -t "=$name"
+    exec tmux -L "$SOCK" switch-client -t "=$name"
   fi
   # otherwise attach (nested when called from another tmux)
-  TMUX="" exec command tmux -L "$SOCK" attach-session -t "=$name"
+  TMUX="" exec tmux -L "$SOCK" attach-session -t "=$name"
 }
 
 case "$action" in
