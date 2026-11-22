@@ -114,6 +114,27 @@ If the VM runs in a cloud, open only port 22 in its firewall and ideally only fo
 If the VM has a **cloud identity** attached, such as an instance role or a managed identity, any process on it, the
 agent included, can request tokens for that cloud. Remove the identity or keep its rights minimal.
 
+### A frontend development server on the VM
+
+With the [`web` module](configuration.md#the-web-module) you start the development server yourself, in the
+terminal pane of the session on the VM. To open the application in your local browser, forward its port the same
+way. Angular's server uses port 4200.
+
+```ssh-config
+Host my-vm
+  LocalForward 4200 127.0.0.1:4200
+```
+
+Start the server with `ng serve --ssl` and open `https://localhost:4200` on the computer you sit at. The server
+only listens on `127.0.0.1` of the VM, and the forward only on `127.0.0.1` of your own computer. Your browser
+warns about the certificate the first time, because the development server signs its own. When the frontend
+reaches its backend through the proxy configuration of the development server (`proxy.conf.json`), this one port
+is enough. Otherwise add a `LocalForward` line for the backend's port as well.
+
+A backend that you start with `dotnet run` in its own session works the same way. It prints the address it
+listens on when it starts, and by default that is `localhost` only. Add a line with that port, for example
+`LocalForward 5001 127.0.0.1:5001`, when you want to call the backend from your local browser or an API client.
+
 ## WSL on Windows
 
 Follow the Linux steps inside your WSL distribution. A few things are different from a regular Linux machine.
@@ -132,6 +153,49 @@ put `ICONS="unicode"` into `~/.config/samebench/local.sh` and run `samebench app
 > `/etc/wsl.conf` with `[automount] enabled=false` and `[interop] enabled=false`. After that, `jlab` can no longer open
 > the browser and shows the link instead. `samebench doctor` reminds you of this on WSL.
 
+## The .NET SDK
+
+The [`dotnet` module](configuration.md#the-dotnet-module) needs a .NET SDK, and the SDK comes from your system.
+mise could install it as well, but it does so without verifying a checksum, so this setup leaves the SDK to the
+package manager of the system. `DOTNET_SDK` names the versions you want, by default `"10.0 11.0"`. `samebench
+apply` looks for them before it shows its plan, and a missing version never stops the setup. Without any SDK of
+version 10 or newer the two .NET tools are left out, and C# stays at syntax highlighting until you install one
+and run `samebench apply` again.
+
+On a Mac, install the SDK with the signed installer package from Microsoft, which the
+[install page for macOS](https://learn.microsoft.com/dotnet/core/install/macos) links. `samebench` downloads
+nothing here. The installer puts .NET into `/usr/local/share/dotnet` and adds it to the `PATH` of new terminals,
+so open a new terminal before you run `samebench apply` again. Several SDK versions can sit side by side.
+
+On Ubuntu and Debian, `samebench apply` shows the command and asks, as it does for the other system packages. It
+only offers that when your package sources have the package.
+
+```text
+ !! Missing .NET SDK 10.0. Your package sources offer dotnet-sdk-10.0 <version>.
+Install it now with "sudo apt-get install -y dotnet-sdk-10.0"? [y/N]
+```
+
+Where a version comes from depends on the release. This is the state of November 2026.
+
+| System | .NET 10 | .NET 11 |
+|---|---|---|
+| Ubuntu 24.04 and 26.04 | the Ubuntu archive | only the .NET backports PPA |
+| Ubuntu 26.10 | the Ubuntu archive | the Ubuntu archive |
+| Ubuntu 22.04 | only the .NET backports PPA | only the .NET backports PPA |
+| Debian 12 and 13 | only Microsoft's package feed | only Microsoft's package feed |
+
+The Ubuntu archive is the signed archive of the distribution, which your system trusts anyway. The backports PPA
+(`ppa:dotnet/backports`) and Microsoft's feed (`packages.microsoft.com`) are separate package sources outside of
+it. `samebench` never adds a package source. When a version only comes from one of them, it says so and goes on,
+and you decide whether you add that source yourself. Stay with one source for .NET on a machine, because packages
+from different sources get in each other's way.
+
+Ubuntu builds its SDK from source in the first feature band of a version, for example `10.0.1xx`, while
+Microsoft's installer brings a later band such as `10.0.4xx`. Both come with the same runtime. The difference
+shows when a project pins the SDK in a `global.json`. A pin to a version of the 4xx band does not find Ubuntu's
+SDK. A pin that both satisfy works everywhere, for example `10.0.100` together with
+`"rollForward": "latestFeature"`.
+
 ## Machines with an existing setup
 
 `samebench` never deletes or uninstalls anything it did not create, and it doesn't replace configuration files that
@@ -143,6 +207,11 @@ belong to someone else without keeping a copy.
 | Your own tmux and `tmux.conf` | Stay as they are. `dev` runs its own tmux server |
 | `~/.config/uv/uv.toml` with your own uv settings | Stays unchanged |
 | uv, Jupyter or Python from Homebrew, pip or apt | Stay installed, and `samebench plan` lists them |
+| Node.js from nvm, Homebrew or apt | Stays installed. With the `web` module, `samebench plan` lists it |
+| `~/.npmrc` with your own npm settings, for example a company registry | Stays unchanged and is used. The language servers of the `web` module come through the registry it names |
+| A .NET SDK that is already installed | Is used as it is. With the `dotnet` module, `samebench` reads `dotnet --list-sdks` and changes nothing |
+| Global .NET tools in `~/.dotnet/tools` | Stay as they are. The `dotnet` module keeps its two tools in a folder of its own |
+| Your NuGet configuration, for example a company feed | Stays unchanged and is used. The .NET tools of the `dotnet` module come through the feeds it names |
 | A mise of another version in `~/.local/bin` | Is kept as `mise.backup-<date>` with a warning, and the pinned version takes its place |
 | `~/.config/mise/config.toml`, as a file or as a link of your own | Is kept as `config.toml.backup-<date>` and replaced by a link into the repository |
 | `.zshrc`, `.bashrc`, global git config | Get one addition each, nothing is replaced |
@@ -162,15 +231,17 @@ Details of a single machine, such as mirror URLs or host names, never belong in 
 
 ## Behind a proxy
 
-Nothing in this repository sets or changes proxy settings. curl, git, mise and uv all read the standard variables
-`HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` from your environment. A machine that already reaches the internet through
-a proxy therefore needs no extra step for `samebench` or the daily check.
+Nothing in this repository sets or changes proxy settings. curl, git, mise, uv, npm and dotnet all read the
+standard variables `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` from your environment. A machine that already
+reaches the internet through a proxy therefore needs no extra step for `samebench` or the daily check.
 
 A few things are worth knowing.
 
 - A proxy that inspects TLS traffic presents its own certificates. curl, git and mise trust the system certificate
   store. uv brings its own list and only looks at the system store when you ask for it, with `system-certs = true`
   in `~/.config/uv/uv.toml` or `UV_SYSTEM_CERTS=1` in your environment. `samebench` never touches that file.
+  Node and npm bring their own list as well. Name the certificate of your proxy with `cafile` in `~/.npmrc`,
+  which `samebench` never touches either.
 - Downloads are still compared with the checksums in the lockfiles, so a file that changes on the way is rejected.
 - Requests to JupyterLab on `127.0.0.1` never go through a proxy. <kbd>Space</kbd> <kbd>j</kbd> <kbd>k</kbd> ignores
   the proxy variables on purpose, because the login token must not leave the machine.
@@ -187,8 +258,11 @@ samebench remove
 This removes the line in `.zshrc` and `.bashrc`, the additions to your global git config, all links (backups come
 back) and running `dev` sessions. Afterwards it asks separately whether the installed programs, their data and the
 caches should go too. If you say yes and `samebench` had put a mise of yours aside, that one comes back, and the
-folders of mise stay because they hold its tools as well. Your `local.sh` and your `allowed_signers` stay. Python
-versions installed by uv and its package cache live in `~/.local/share/uv` and
-`~/.cache/uv`. They belong to uv, so they stay as well. A few small caches can stay too, from tree-sitter, from ty
-and from the signature check in mise, because other programs may share them. `samebench remove` names them when they
-exist.
+folders of mise stay because they hold its tools as well. Your `local.sh` and your `allowed_signers` stay. The
+list of project folders you trusted goes with the rest of `~/.config/samebench`, so a later setup asks again. Python
+versions installed by uv and its package cache live in `~/.local/share/uv` and `~/.cache/uv`. They belong to uv,
+so they stay as well. The same goes for the package cache of npm in `~/.npm`. With the `dotnet` module, the SDK
+stays because it belongs to your system, and so do `~/.dotnet`, the package cache in `~/.nuget` and the folders
+in which the .NET language servers keep their own logs and caches. A few small caches can stay too, from
+tree-sitter, from ty and from the signature check in mise, because other programs may share them.
+`samebench remove` names them when they exist.

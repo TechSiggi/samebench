@@ -31,13 +31,27 @@ DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 # Always ~/.config/samebench: the line in the shell startup files, tmux.conf and the docs name
 # this path, so local.sh and allowed_signers must not be looked up anywhere else.
 STATE_DIR="$HOME/.config/samebench"
+# Project folders whose code the editor may load, one per line, written by dev after a yes
+TRUST_STORE="$STATE_DIR/trusted"
 DATA_DIR="$DATA_HOME/samebench"
 JUPYTER_VENV="$DATA_DIR/jupyter-venv"
 KERNEL_REQS="$DATA_DIR/kernel-requirements.txt"
 MISE_LOCK="$SAMEBENCH_REPO/config/mise-global/mise.lock"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/samebench"
-LOCKFILES="config/mise-global/mise.lock envs/jupyter/uv.lock modules"
+LOCKFILES="config/mise-global/mise.lock envs/jupyter/uv.lock envs/web/package-lock.json envs/dotnet/tools.txt modules"
 JUPYTER_PROJECT="$SAMEBENCH_REPO/envs/jupyter"
+# Module "web": the language servers (envs/web) are installed into their own folder
+WEB_PROJECT="$SAMEBENCH_REPO/envs/web"
+WEB_ENV="$DATA_DIR/web-lsp"
+WEB_SERVERS="vtsls ngserver vscode-html-language-server vscode-css-language-server vscode-json-language-server vscode-eslint-language-server"
+# npm runs no install scripts, takes nothing from git, sends no audit request and does not
+# look for a newer npm. The registry is the one from your own npm configuration.
+NPM_FLAGS="--ignore-scripts --allow-git=none --no-audit --no-fund --no-update-notifier"
+# Module "dotnet": the .NET SDK comes from the system, the two pinned .NET tools that Neovim
+# needs (envs/dotnet/tools.txt) are installed into their own folder
+DOTNET_TOOLS_FILE="$SAMEBENCH_REPO/envs/dotnet/tools.txt"
+DOTNET_TOOLS="$DATA_DIR/dotnet-tools"
+DOTNET_COMMANDS="dotnet-easydotnet roslyn-language-server"
 LOCK_PLATFORMS="macos-arm64,linux-x64,linux-arm64"
 # Neovim gets its own config and data folders (~/.config/samebench-nvim,
 # ~/.local/share/samebench-nvim), so an existing Neovim setup stays untouched.
@@ -69,6 +83,8 @@ load_profile() {
   JUPYTER="ondemand"
   ACTIVATE="global"
   CHECK="daily"   # daily check when dev starts: daily | off
+  TRUST="ask"     # project code in the editor: ask = dev asks once per folder | all = always allowed
+  DOTNET_SDK="10.0 11.0" # module "dotnet": the .NET SDK versions you want on this machine
   UPDATER="no"    # yes = this machine maintains the lockfiles (commit + push)
   # shellcheck source=/dev/null
   . "$SAMEBENCH_REPO/profiles/$name.sh"
@@ -79,10 +95,19 @@ load_profile() {
   case "$JUPYTER" in yes | ondemand | no) ;; *) die "JUPYTER=\"$JUPYTER\", allowed: yes | ondemand | no" ;; esac
   case "$ACTIVATE" in global | dev) ;; *) die "ACTIVATE=\"$ACTIVATE\", allowed: global | dev" ;; esac
   case "$CHECK" in daily | off) ;; *) die "CHECK=\"$CHECK\", allowed: daily | off" ;; esac
+  case "$TRUST" in ask | all) ;; *) die "TRUST=\"$TRUST\", allowed: ask | all" ;; esac
+  local v sdks=""
+  for v in $DOTNET_SDK; do
+    case "$v" in [1-9].0 | [1-9][0-9].0) sdks=1 ;; *) sdks=""; break ;; esac
+  done
+  [ -n "$sdks" ] || die "DOTNET_SDK=\"$DOTNET_SDK\", allowed: one or more .NET versions separated by spaces, for example \"10.0 11.0\""
   export UV_PYTHON_DOWNLOADS
 }
 
 has_module() { case " $MODULES " in *" $1 "*) return 0 ;; esac; return 1; }
+# Is a module active whose language servers and formatters can load code from a project?
+# For those, dev asks once per project folder (see "Trust" in bin/dev).
+runs_project_code() { has_module web || has_module dotnet; }
 all_modules() { (cd "$SAMEBENCH_REPO/modules" && ls); }
 
 # --------------------------------------------------------------- Helpers ---
@@ -284,6 +309,15 @@ EOF
 
 write_env() {
   say "Writing the shell environment"
+  local module_env="" trust_env=""
+  # Neovim starts the language servers of the web module from this folder
+  if has_module web; then module_env=$'\n'"export SAMEBENCH_WEB_LSP=\"$WEB_ENV\""; fi
+  # Neovim puts this folder with the pinned .NET tools on its own PATH
+  if has_module dotnet; then module_env="$module_env"$'\n'"export SAMEBENCH_DOTNET_TOOLS=\"$DOTNET_TOOLS\""; fi
+  # TRUST="all": every folder is trusted, also for a Neovim that was not started by dev.
+  # With "ask" only dev sets this variable, for each session.
+  # The empty SAMEBENCH_TRUSTED_DIR says that this trust is not tied to one folder.
+  if [ "$TRUST" = all ]; then trust_env=$'\n'"export SAMEBENCH_TRUSTED=1 SAMEBENCH_TRUSTED_DIR=\"\""; fi
   mkdir -p "$STATE_DIR"
   printf '%s\n' "$PROFILE" >"$STATE_DIR/profile"
   cat >"$STATE_DIR/env.sh" <<EOF
@@ -300,6 +334,7 @@ export SAMEBENCH_JUPYTER="$JUPYTER"
 export SAMEBENCH_JUPYTER_VENV="$JUPYTER_VENV"
 export SAMEBENCH_UV_PYTHON_DOWNLOADS="$UV_PYTHON_DOWNLOADS"
 export SAMEBENCH_ICONS="$ICONS"
+export SAMEBENCH_TRUST="$TRUST"$module_env
 case ":\$PATH:" in *":\$HOME/.local/bin:"*) ;; *) PATH="\$HOME/.local/bin:\$PATH" ;; esac
 case ":\$PATH:" in *":$SAMEBENCH_REPO/bin:"*) ;; *) PATH="$SAMEBENCH_REPO/bin:\$PATH" ;; esac
 export PATH
@@ -313,7 +348,7 @@ export NVIM_APPNAME="$NVIM_APP"
 export UV_PYTHON_DOWNLOADS="\$SAMEBENCH_UV_PYTHON_DOWNLOADS"
 export LG_CONFIG_FILE="$SAMEBENCH_REPO/config/lazygit/config.yml$( [ "$ICONS" = nerd ] && printf ',%s' "$SAMEBENCH_REPO/config/lazygit/nerd.yml" )"
 export JUPYTER_CONFIG_PATH="$SAMEBENCH_REPO/config/jupyter"
-export EDITOR=nvim VISUAL=nvim
+export EDITOR=nvim VISUAL=nvim$trust_env
 # Put the project environment (.venv) set by "dev" back in front of the PATH
 # (macOS resets the PATH whenever a login shell starts)
 if [ -n "\${VIRTUAL_ENV:-}" ] && [ -d "\$VIRTUAL_ENV/bin" ]; then
@@ -436,6 +471,8 @@ install_nvim_plugins() {
     # installed. A run that fails halfway would drop pins that way, and the next run would
     # install the newest commits instead. So the pinned list is kept aside, put back when
     # lazy.nvim changed it, and the checkouts are compared with it at the end.
+    # A plugin of an optional module (easy-dotnet.nvim) is named for every machine in
+    # lua/plugins/modules.lua, so it is checked out here as well and keeps its pin.
     keep="$(mktemp)"
     cat "$lock" >"$keep"
     for _ in 1 2; do
@@ -473,7 +510,11 @@ ensure_tool_python() {
   uv python install
 }
 
-jupyter_count() { grep -c '^\[\[package\]\]' "$JUPYTER_PROJECT/uv.lock" 2>/dev/null || echo "?"; }
+# count_lines <pattern> <file>: grep -c prints 0 and fails when nothing matches, and prints
+# nothing when the file is missing. One value comes out in every case.
+count_lines() { local n; n="$(grep -c "$1" "$2" 2>/dev/null || true)"; printf '%s\n' "${n:-?}"; }
+
+jupyter_count() { count_lines '^\[\[package\]\]' "$JUPYTER_PROJECT/uv.lock"; }
 
 # What will be installed, shown before installing
 jupyter_summary() {
@@ -484,9 +525,9 @@ jupyter_summary() {
 
 sync_jupyter() {
   [ -s "$JUPYTER_PROJECT/uv.lock" ] || die "envs/jupyter/uv.lock is missing, run 'samebench update' on the updater machine and commit."
-  UV_PROJECT_ENVIRONMENT="$JUPYTER_VENV" uv sync --frozen --project "$JUPYTER_PROJECT"
+  UV_PROJECT_ENVIRONMENT="$JUPYTER_VENV" uv sync --frozen --project "$JUPYTER_PROJECT" || return 1
   # ipykernel and its dependencies with hashes, for projects without their own ipykernel
-  mkdir -p "$DATA_DIR"
+  mkdir -p "$DATA_DIR" || return 1
   uv export --quiet --frozen --project "$JUPYTER_PROJECT" --only-group kernel --no-emit-project -o "$KERNEL_REQS"
 }
 
@@ -561,17 +602,220 @@ cmd_kernel() {
   printf '%s\n' "$kroot"
 }
 
+# -------------------------------------------------- Web language servers ---
+# Module "web": vtsls, the Angular language server, TypeScript and the HTML, CSS, JSON and
+# ESLint servers (envs/web). npm installs them exactly as package-lock.json says, compares
+# every package with its integrity hash and runs no install scripts.
+
+web_installed() { [ -x "$WEB_ENV/node_modules/.bin/vtsls" ]; }
+
+# Installed from exactly the package list and lockfile the repository has now? The copy of
+# the lockfile is only written after an install that went through.
+web_current() {
+  web_installed && cmp -s "$WEB_PROJECT/package-lock.json" "$WEB_ENV/.installed-lock" &&
+    cmp -s "$WEB_PROJECT/package.json" "$WEB_ENV/package.json"
+}
+
+web_count() { count_lines '"resolved":' "$WEB_PROJECT/package-lock.json"; }
+
+# What will be installed, shown before installing
+web_summary() {
+  echo "   Source:  $WEB_PROJECT/package-lock.json (pinned versions, integrity hashes verified)"
+  echo "   Size:    $(web_count) packages (vtsls, Angular language server, TypeScript, HTML, CSS, JSON and ESLint servers)"
+  echo "   Target:  $WEB_ENV (npm ci, no install scripts, registry from your npm configuration)"
+}
+
+# cutoff_date <days>: the time that many days ago in UTC, with BSD date (macOS) or GNU date
+cutoff_date() {
+  date -u -v-"$1"d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "$1 days ago" +%Y-%m-%dT%H:%M:%SZ
+}
+
+need_npm() {
+  command -v npm >/dev/null 2>&1 || die "npm is missing (it comes with Node from the web module), run 'samebench apply'."
+}
+
+# lock_web <install|update>: write package-lock.json from versions that are at least 7 days
+# old. "install" keeps what is locked, "update" moves within the ranges of package.json.
+# Only the lockfile is written, nothing is installed into the repository.
+lock_web() {
+  local before
+  before="$(cutoff_date 7)" || die "Could not work out the date for the 7 day rule, nothing changed."
+  # shellcheck disable=SC2086
+  (cd "$WEB_PROJECT" && npm "$1" --package-lock-only $NPM_FLAGS --before="$before")
+}
+
+sync_web() {
+  need_npm
+  if [ ! -s "$WEB_PROJECT/package-lock.json" ]; then
+    no_lockfile envs/web/package-lock.json
+    warn "No package-lock.json for the web language servers yet, creating it now (once, commit it afterwards!)."
+    lock_web install
+  fi
+  if web_current; then return 0; fi
+  # The package list and the lockfile are copied, so npm never writes into the repository
+  mkdir -p "$WEB_ENV"
+  rm -f "$WEB_ENV/.installed-lock"
+  cp "$WEB_PROJECT/package.json" "$WEB_PROJECT/package-lock.json" "$WEB_ENV/"
+  # shellcheck disable=SC2086
+  (cd "$WEB_ENV" && npm ci $NPM_FLAGS) ||
+    die "npm ci failed, the web language servers are NOT installed. Run 'samebench apply' again."
+  cp "$WEB_PROJECT/package-lock.json" "$WEB_ENV/.installed-lock"
+}
+
+# ----------------------------------------------------------------- .NET ---
+# Module "dotnet". The SDK comes from the system and is never installed by samebench without
+# a question. The two tools in envs/dotnet/tools.txt are installed with `dotnet tool` at
+# exactly the pinned versions, so that neither easy-dotnet.nvim nor its server ever installs
+# them on its own.
+
+# The SDK versions on this machine, one "10.0" per line (nothing without dotnet)
+dotnet_sdks() {
+  command -v dotnet >/dev/null 2>&1 || return 0
+  DOTNET_NOLOGO=1 DOTNET_GENERATE_ASPNET_CERTIFICATE=false dotnet --list-sdks 2>/dev/null |
+    awk '{ split($1, p, "."); if (p[1] ~ /^[0-9]+$/ && p[2] ~ /^[0-9]+$/) print p[1] "." p[2] }' | sort -u
+}
+dotnet_has_sdk() { dotnet_sdks | grep -qxF "$1"; }
+# The C# language server needs the runtime of .NET 10 or newer
+dotnet_usable() { dotnet_sdks | awk -F. '$1 >= 10 { found = 1 } END { exit !found }'; }
+
+# check_dotnet: compare the SDK versions you want (DOTNET_SDK) with the ones on this machine.
+# A missing one is a note and never stops the setup.
+check_dotnet() {
+  has_module dotnet || return 0
+  local v missing="" candidate os_id
+  for v in $DOTNET_SDK; do dotnet_has_sdk "$v" || missing="$missing $v"; done
+  if [ -z "$missing" ]; then
+    ok ".NET SDK present ($(dotnet_sdks | tr '\n' ' ' | sed 's/ $//'), from the system)"
+    return 0
+  fi
+  case "$(uname -s)" in
+    Darwin)
+      if ! command -v dotnet >/dev/null 2>&1 && [ -x /usr/local/share/dotnet/dotnet ]; then
+        warn ".NET is installed in /usr/local/share/dotnet, but this shell does not have it on its PATH yet."
+        echo "   Open a new terminal and run 'samebench apply' again." >&2
+        return 0
+      fi
+      warn "Missing .NET SDK:$missing"
+      echo "   samebench downloads nothing here. Install it with Microsoft's signed installer (.pkg)," >&2
+      echo "   see https://learn.microsoft.com/dotnet/core/install/macos, then open a new terminal" >&2
+      echo "   and run 'samebench apply' again." >&2
+      ;;
+    Linux)
+      os_id="$(sed -n 's/^ID=//p' /etc/os-release 2>/dev/null | tr -d '"')"
+      for v in $missing; do
+        candidate="$(apt-cache policy "dotnet-sdk-$v" 2>/dev/null | awk '$1 == "Candidate:" { print $2 }')"
+        if [ -n "$candidate" ] && [ "$candidate" != "(none)" ]; then
+          warn "Missing .NET SDK $v. Your package sources offer dotnet-sdk-$v $candidate."
+          if ask "Install it now with \"sudo apt-get install -y dotnet-sdk-$v\"?"; then
+            sudo apt-get install -y "dotnet-sdk-$v" || warn "The install failed, the setup goes on without .NET SDK $v."
+          fi
+        else
+          warn "Missing .NET SDK $v, and your package sources do not offer dotnet-sdk-$v."
+          if [ "$os_id" = ubuntu ]; then
+            echo "   Ubuntu publishes the versions its archive does not have in the .NET backports PPA" >&2
+            echo "   (ppa:dotnet/backports), which is outside the signed distribution archive." >&2
+          else
+            echo "   Microsoft publishes .NET for Debian in its own package feed (packages.microsoft.com), which is" >&2
+            echo "   outside the signed distribution archive." >&2
+          fi
+          echo "   samebench never adds a package source. Add it yourself if you want it, then run 'samebench apply' again." >&2
+        fi
+      done
+      ;;
+  esac
+  return 0
+}
+
+# The pinned tools as "<package id> <version>" lines. Both fields end up on a command line,
+# so a line only passes with the characters package ids and versions are made of.
+dotnet_tools_list() {
+  local id ver rest
+  [ -s "$DOTNET_TOOLS_FILE" ] || die "envs/dotnet/tools.txt is missing or empty, nothing installed. Restore it with git."
+  while read -r id ver rest; do
+    case "$id" in "" | "#"*) continue ;; esac
+    case "$id" in [!A-Za-z0-9]* | *[!A-Za-z0-9._-]*) die "envs/dotnet/tools.txt: \"$id\" is not a package id, nothing installed." ;; esac
+    case "$ver" in "" | [!0-9]* | *[!A-Za-z0-9.+-]*) die "envs/dotnet/tools.txt: \"$ver\" is not a version (package $id), nothing installed." ;; esac
+    [ -z "$rest" ] || die "envs/dotnet/tools.txt: the line for $id has more than a package id and a version, nothing installed."
+    printf '%s %s\n' "$id" "$ver"
+  done <"$DOTNET_TOOLS_FILE"
+}
+
+# dotnet keeps a tool in <tools folder>/.store/<package id>/<version>, both in lower case.
+lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+
+# dotnet_tool_version <package id>: what is installed, nothing when the tool is missing.
+# Normally one version. More than one (a broken install) come out on one line.
+dotnet_tool_version() {
+  local store
+  store="$DOTNET_TOOLS/.store/$(lower "$1")"
+  [ -d "$store" ] || return 0
+  ls "$store" | tr '\n' ' ' | sed 's/ $//'
+}
+
+# dotnet_tool_at <package id> <version>: is exactly this version installed, and no other?
+dotnet_tool_at() { [ "$(dotnet_tool_version "$1")" = "$(lower "$2")" ]; }
+
+# Is every pinned tool installed at exactly its version?
+dotnet_tools_current() {
+  local tools id ver
+  tools="$(dotnet_tools_list 2>/dev/null)" || return 1
+  while read -r id ver; do
+    [ -n "$id" ] || continue
+    dotnet_tool_at "$id" "$ver" || return 1
+  done <<EOF
+$tools
+EOF
+}
+
+# Bring every tool to its pinned version. The command runs in the home folder, so a NuGet
+# configuration lying in some project folder is never read, and the feed is the one from your
+# own NuGet configuration. NuGet checks the package signatures of nuget.org where it can.
+sync_dotnet_tools() {
+  local tools id ver have
+  tools="$(dotnet_tools_list)" || exit 1
+  # Two versions of one tool are what an interrupted install leaves behind, and dotnet can't
+  # repair that. The folder only holds these tools, so it is emptied and filled again.
+  while read -r id ver; do
+    case "$(dotnet_tool_version "$id")" in
+      *" "*)
+        warn "$DOTNET_TOOLS holds more than one version of $id, installing the .NET tools afresh."
+        rm -rf "${DOTNET_TOOLS:?}"
+        break
+        ;;
+    esac
+  done <<EOF
+$tools
+EOF
+  while read -r id ver; do
+    [ -n "$id" ] || continue
+    if dotnet_tool_at "$id" "$ver"; then ok "$id $ver already installed"; continue; fi
+    have="$(dotnet_tool_version "$id")"
+    say "Installing $id $ver${have:+ (replaces $have)} with dotnet tool"
+    # Without the banner. The first dotnet command on a machine also creates the ASP.NET
+    # development certificate, and that is left to the first dotnet command you run yourself.
+    (cd "$HOME" && DOTNET_NUGET_SIGNATURE_VERIFICATION=true DOTNET_NOLOGO=1 DOTNET_GENERATE_ASPNET_CERTIFICATE=false \
+      dotnet tool update --tool-path "$DOTNET_TOOLS" "$id" --version "$ver" --allow-downgrade </dev/null) ||
+      die "dotnet tool could not install $id $ver, the .NET tools are NOT complete. Run 'samebench apply' again."
+    dotnet_tool_at "$id" "$ver" ||
+      die "$id is not at the pinned version $ver after the install, the .NET tools are NOT complete."
+  done <<EOF
+$tools
+EOF
+}
+
 # ------------------------------------------------------------------ Plan ---
 # Tools of the active modules from mise.lock: "tool|version|verification|url"
+# mise writes the tools of its core backend without quotes and without the backend
+# ("core:node" in tools.toml is [[tools.node]] in the lockfile), all others in quotes.
 plan_tools() {
   local plat="$1" keys m
   keys="$(for m in $MODULES; do
     [ -f "$SAMEBENCH_REPO/modules/$m/tools.toml" ] && sed -n 's/^"\([^"]*\)".*/\1/p' "$SAMEBENCH_REPO/modules/$m/tools.toml"
-  done | tr '\n' ' ')"
+  done | sed 's/^core://' | tr '\n' ' ')"
   awk -v plat="$plat" -v keys="$keys" '
     BEGIN { n = split(keys, k, " "); for (i = 1; i <= n; i++) want[k[i]] = 1 }
-    /^\[\[tools\."/ { match($0, /"[^"]+"/); tool = substr($0, RSTART + 1, RLENGTH - 2); inplat = 0; next }
-    /^\[tools\."/ { inplat = (index($0, "\"platforms." plat "\"]") > 0); next }
+    /^\[\[tools\./ { tool = $0; sub(/^\[\[tools\./, "", tool); sub(/\]\]$/, "", tool); gsub(/"/, "", tool); inplat = 0; next }
+    /^\[tools\./ { inplat = (index($0, "\"platforms." plat "\"]") > 0); next }
     !inplat && /^version = / { v = $3; gsub(/"/, "", v); ver[tool] = v }
     inplat && /^url = / { u = $3; gsub(/"/, "", u); url[tool] = u }
     inplat && /^provenance = / { p = $3; gsub(/"/, "", p); prov[tool] = p }
@@ -632,6 +876,45 @@ EOF
   else item "↓" "$missing of $n plugins will be downloaded (git clone, then the locked commit)"; fi
   item "" "Treesitter parsers: source code from GitHub, compiled locally (locked through nvim-treesitter)"
 
+  if has_module web; then
+    echo
+    say "Web language servers (exact versions from envs/web/package-lock.json, source: the npm registry)"
+    if web_current; then item ok "$(web_count) packages installed ($WEB_ENV)"
+    elif [ ! -s "$WEB_PROJECT/package-lock.json" ]; then
+      if [ "$UPDATER" = yes ]; then item "↓" "no package-lock.json yet, it will be created from versions that are at least 7 days old, then installed"
+      else item "!" "envs/web/package-lock.json is missing, the setup will stop there (restore it with git)"; fi
+    else
+      item "↓" "$(web_count) packages will be installed with npm ci (integrity hashes verified, no install scripts)"
+      printf '         %s\n' "vtsls, Angular language server, TypeScript, HTML, CSS, JSON and ESLint servers" \
+        "from the registry in your npm configuration (registry.npmjs.org unless you changed it), into $WEB_ENV"
+    fi
+  fi
+
+  if has_module dotnet; then
+    echo
+    say ".NET (SDK from your system, tools at the exact versions from envs/dotnet/tools.txt)"
+    for t in $DOTNET_SDK; do
+      if dotnet_has_sdk "$t"; then item ok ".NET SDK $t present (system)"
+      else item "!" ".NET SDK $t missing. It comes from your system, see \"The .NET SDK\" in the installation guide"; fi
+    done
+    for t in $(dotnet_sdks); do
+      case " $DOTNET_SDK " in *" $t "*) ;; *) item "=" ".NET SDK $t present (system, not in DOTNET_SDK)" ;; esac
+    done
+    if [ ! -s "$DOTNET_TOOLS_FILE" ]; then
+      item "!" "envs/dotnet/tools.txt is missing, the setup will stop there (restore it with git)"
+    else
+      dotnet_tools_list | while read -r t ver; do
+        have="$(dotnet_tool_version "$t")"
+        if dotnet_tool_at "$t" "$ver"; then item ok "$(printf '%-28s %s' "$t" "$ver")"
+        elif ! dotnet_usable; then item "-" "$(printf '%-28s %-20s %s' "$t" "$ver" "not installed without a .NET SDK 10 or newer")"
+        else item "↓" "$(printf '%-28s %-20s %s' "$t" "$ver" "dotnet tool${have:+, replaces $have}")"; fi
+      done
+      if dotnet_usable && ! dotnet_tools_current; then
+        printf '         %s\n' "from the feed in your NuGet configuration (nuget.org unless you changed it), into $DOTNET_TOOLS"
+      fi
+    fi
+  fi
+
   echo
   say "Python and Jupyter"
   if [ "$JUPYTER" = no ]; then item "-" "Jupyter turned off"
@@ -666,6 +949,13 @@ EOF
     if git config --global --get-all include.path 2>/dev/null | grep -qxF "$STATE_DIR/gitconfig"; then item ok "git (global): notebook diffs set up"
     else item "+" "git (global): include.path, '*.ipynb diff=samebench-ipynb', ignore '.*.nb.py'"; fi
   fi
+  if runs_project_code; then
+    if [ "$TRUST" = all ]; then
+      item "!" "Project code in the editor: allowed in every folder without asking (TRUST=\"all\")"
+    else
+      item "" "Project code in the editor: dev asks once per project folder, the answers go to $TRUST_STORE"
+    fi
+  fi
   item "" "tmux: its own server (tmux -L samebench) with the configuration from the repository, your tmux stays untouched"
   item "" "Neovim: its own folder ~/.config/$NVIM_APP, an existing ~/.config/nvim stays untouched"
   if [ -e "$CONFIG_HOME/uv/uv.toml" ] && [ ! -L "$CONFIG_HOME/uv/uv.toml" ]; then
@@ -675,7 +965,7 @@ EOF
   echo
   say "Programs already installed outside samebench (left untouched)"
   found=""
-  for t in nvim tmux lazygit rg fd uv ruff ty jupyter python3; do
+  for t in nvim tmux lazygit rg fd uv ruff ty jupyter python3 $(has_module web && echo "node npm"); do
     for p in $(type -ap "$t" 2>/dev/null | awk '!seen[$0]++'); do
       case "$p" in "$DATA_HOME/mise/"* | "$SAMEBENCH_REPO/"* | */.venv/* | "$DATA_DIR/"*) continue ;; esac
       [ "$p" = /usr/bin/python3 ] && [ "$(uname -s)" = Darwin ] && continue
@@ -696,15 +986,16 @@ EOF
 
 # run_check [project folder] returns 0 when checked, 2 when the check did not finish
 run_check() {
-  local project="${1:-}" venv=""
+  local project="${1:-}" venv="" web=""
   mkdir -p "$CACHE_DIR"
   jupyter_installed && venv="$JUPYTER_VENV"
+  has_module web && web_installed && web="$WEB_ENV"
   if [ -n "$project" ] && [ ! -f "$project/uv.lock" ]; then project=""; fi
   mise_env 2>/dev/null || true
   command -v nvim >/dev/null 2>&1 || { warn "nvim is missing, run 'samebench apply'."; return 2; }
   command -v curl >/dev/null 2>&1 || { warn "curl is missing."; return 2; }
   # NVIM_APPNAME doesn't matter here, nvim -l loads no configuration
-  if nvim -l "$SAMEBENCH_REPO/libexec/samebench-check.lua" "$SAMEBENCH_REPO" "$venv" "$CACHE_DIR/check.txt" "$project"; then
+  if nvim -l "$SAMEBENCH_REPO/libexec/samebench-check.lua" "$SAMEBENCH_REPO" "$venv" "$CACHE_DIR/check.txt" "$project" "$web"; then
     touch "$CACHE_DIR/check.stamp"
     return 0
   fi
@@ -724,12 +1015,12 @@ urgent_targets() {
 }
 
 show_details() { # every finding, readable
-  awk -F'|' '{ printf "   %-9s %-8s %s %s  %s%s\n      %s\n", $1, ($2=="tool"?"tool":($2=="jupyter"?"Jupyter":"project")), $4, $5, $6, ($7!=""?"  → fixed in "$7:"  → no fix yet"), $8 }' "$1"
+  awk -F'|' '{ printf "   %-9s %-8s %s %s  %s%s\n      %s\n", $1, ($2=="tool"?"tool":($2=="jupyter"?"Jupyter":($2=="web"?"web":"project"))), $4, $5, $6, ($7!=""?"  → fixed in "$7:"  → no fix yet"), $8 }' "$1"
 }
 
 # offer_fixes <findings>: offer fixes for high or critical findings in tools and Jupyter
 offer_fixes() {
-  local f="$1" kind pkg ver target tool ids
+  local f="$1" kind pkg ver target tool ids spec
   while IFS='|' read -r kind pkg ver target tool ids; do
     [ -n "$kind" ] || continue
     if [ -z "$target" ]; then
@@ -737,8 +1028,16 @@ offer_fixes() {
       continue
     fi
     warn "$pkg $ver: high or critical security advisory ($ids), fixed in $target"
+    # cmd_fix refuses a version outside the pinned major, so there is nothing to offer then
+    spec=""
+    if [ "$kind" = tool ]; then spec="$(tool_outside_pin "$tool" "$target")"; fi
+    if [ -n "$spec" ]; then
+      echo "   $target is outside the pin \"$spec\" in modules/*/tools.toml. Change the pin there and run 'samebench update'." >&2
+      continue
+    fi
     if ask "   Lift $pkg to $target now (exception from the 7 day rule)?"; then
-      cmd_fix "$pkg" "$target" || warn "The update failed, see the details above."
+      # In a subshell: a fix that stops must not end the daily check that offered it
+      (cmd_fix "$pkg" "$target") || warn "The update failed, see the details above."
     fi
   done <<EOF
 $(urgent_targets "$f")
@@ -746,11 +1045,14 @@ EOF
 }
 
 summarize() { # short summary without questions
-  local f="$1" n_tool n_proj n_proj_high
-  n_tool="$(awk -F'|' '$2!="project"' "$f" | wc -l | tr -d ' ')"
+  local f="$1" n_tool n_web n_web_high n_proj n_proj_high
+  n_tool="$(awk -F'|' '$2=="tool" || $2=="jupyter"' "$f" | wc -l | tr -d ' ')"
+  n_web="$(awk -F'|' '$2=="web"' "$f" | wc -l | tr -d ' ')"
+  n_web_high="$(awk -F'|' '$2=="web" && ($1=="HIGH"||$1=="CRITICAL")' "$f" | wc -l | tr -d ' ')"
   n_proj="$(awk -F'|' '$2=="project"' "$f" | wc -l | tr -d ' ')"
   n_proj_high="$(awk -F'|' '$2=="project" && ($1=="HIGH"||$1=="CRITICAL")' "$f" | wc -l | tr -d ' ')"
   [ "$n_tool" -gt 0 ] && warn "$n_tool security advisory(ies) for tools or Jupyter, details: samebench check"
+  [ "$n_web" -gt 0 ] && warn "Web language servers: $n_web advisory(ies) ($n_web_high high or critical), details: samebench check"
   [ "$n_proj" -gt 0 ] && warn "Project: $n_proj advisory(ies) in uv.lock ($n_proj_high high or critical), details: samebench check ."
   return 0
 }
@@ -765,37 +1067,82 @@ cmd_check() {
   show_details "$CACHE_DIR/check.txt"
   echo
   echo "   Not covered (no matching package in OSV): Neovim, tmux and Python itself, the update day takes care of them."
+  if has_module dotnet; then
+    echo "   Not checked either: the two .NET tools of the dotnet module. The update day shows their new versions."
+  fi
+  if awk -F'|' '$2=="web"' "$CACHE_DIR/check.txt" | grep -q .; then
+    echo "   Web language servers: reported only, there is no targeted fix. 'samebench update' on the updater"
+    echo "   machine brings their new versions once those are 7 days old."
+  fi
   if awk -F'|' '$2=="project"' "$CACHE_DIR/check.txt" | grep -q .; then
     echo "   Project findings: the project is never changed, tell its maintainers if needed."
   fi
   offer_fixes "$CACHE_DIR/check.txt"
 }
 
+# The tools in mise.lock by their key, without quotes: "aqua:owner/name", or "node" for a
+# tool of the core backend
+lock_tool_keys() { sed -n 's/^\[\[tools\.\(.*\)\]\]$/\1/p' "$MISE_LOCK" | tr -d '"'; }
+
+# tool_outside_pin <key> <version>: prints the pin from tools.toml (as recorded in mise.lock)
+# when <version> does not fall under it, and nothing when it does or the pin is "latest"
+tool_outside_pin() {
+  local specs s
+  specs="$(awk -v t="$1" '
+    /^\[\[tools\./ { h = $0; gsub(/"/, "", h); cur = (h == "[[tools." t "]]") }
+    cur && /^specifiers = / { gsub(/^specifiers = \[|\]$|[",]/, ""); print; exit }' "$MISE_LOCK")"
+  [ -n "$specs" ] || return 0
+  for s in $specs; do
+    case "$2" in "$s" | "$s".*) return 0 ;; esac
+    [ "$s" = latest ] && return 0
+  done
+  printf '%s\n' "$specs"
+}
+
 # cmd_fix <package> <version>: lift one tool (mise) or Jupyter package
 cmd_fix() {
-  local pkg="${1:?package missing}" version="${2:?version missing}" kind="" tool="" line
+  local pkg="${1:?package missing}" version="${2:?version missing}" kind="" tool="" line spec
   # The version can come from OSV.dev, so it only passes with the characters versions are made of
   case "$version" in *[!A-Za-z0-9.+_-]*) die "The version for $pkg contains characters that no version has, nothing changed." ;; esac
   load_profile ""
   need_mise
   mise_env
-  line="$(awk -F'|' -v p="$pkg" '$4==p && $2!="project" {print $2"|"$9; exit}' "$CACHE_DIR/check.txt" 2>/dev/null || true)"
+  line="$(awk -F'|' -v p="$pkg" '$4==p && ($2=="tool" || $2=="jupyter") {print $2"|"$9; exit}' "$CACHE_DIR/check.txt" 2>/dev/null || true)"
   kind="${line%%|*}"; tool="${line#*|}"
   if [ -z "$kind" ]; then
-    # without findings: recognise a mise tool by its name, otherwise a Jupyter package
-    tool="$(sed -n 's/^\[\[tools\."\([^"]*\)"\]\]/\1/p' "$MISE_LOCK" | grep -i "/$pkg\$" | head -1 || true)"
-    if [ -n "$tool" ]; then kind=tool; else kind=jupyter; fi
+    # without findings: recognise a mise tool by its name (the whole key, or its end after
+    # a slash), otherwise a Jupyter package
+    tool="$(lock_tool_keys | awk -v p="$pkg" 'BEGIN { p = tolower(p); n = length(p) }
+      { t = tolower($0); if (t == p || substr(t, length(t) - n) == "/" p) { print; exit } }' || true)"
+    if [ -n "$tool" ]; then kind=tool
+    elif grep -qxF "name = \"$pkg\"" "$JUPYTER_PROJECT/uv.lock" 2>/dev/null; then kind=jupyter
+    elif grep -qF "\"node_modules/$pkg\": {" "$WEB_PROJECT/package-lock.json" 2>/dev/null; then
+      die "$pkg belongs to the web language servers, which have no targeted fix. They move with 'samebench update'."
+    else kind=jupyter; fi
   fi
   case "$kind" in
     tool)
+      # A version outside the pinned major does not fit tools.toml (mise would write the new
+      # pin into that file), and changing a major is a deliberate decision made there
+      spec="$(tool_outside_pin "$tool" "$version")"
+      [ -z "$spec" ] ||
+        die "$pkg is pinned to \"$spec\" in modules/*/tools.toml and $version is outside of that, nothing changed. To change the pin, edit tools.toml and run 'samebench update'."
+      # Every step is checked by hand: offer_fixes calls this function in a place where the
+      # shell does not stop at a failed command by itself
       say "Lifting $tool to $version (mise, the checksum stays mandatory)"
-      (export MISE_MINIMUM_RELEASE_AGE=0s; lock_tools "$tool@$version")
-      (cd "$HOME" && mise install --locked)
+      (export MISE_MINIMUM_RELEASE_AGE=0s; lock_tools "$tool@$version") ||
+        die "mise could not lock $tool $version, nothing installed."
+      (cd "$HOME" && mise install --locked) ||
+        die "mise.lock names $tool $version now, but the install failed. $pkg is NOT fixed yet, run 'samebench apply' to try again."
       ;;
     jupyter)
       say "Lifting $pkg in the Jupyter tool to $version (hashes stay mandatory)"
-      uv lock --project "$JUPYTER_PROJECT" --upgrade-package "$pkg==$version" --exclude-newer-package "$pkg=false"
-      if jupyter_installed; then sync_jupyter; fi
+      uv lock --project "$JUPYTER_PROJECT" --upgrade-package "$pkg==$version" --exclude-newer-package "$pkg=false" ||
+        die "uv could not lock $pkg $version, nothing installed."
+      if jupyter_installed; then
+        sync_jupyter ||
+          die "uv.lock names $pkg $version now, but the install failed. $pkg is NOT fixed yet, run 'samebench apply' to try again."
+      fi
       ;;
   esac
   ok "$pkg $version installed."
@@ -823,7 +1170,7 @@ cmd_fix() {
 patch_in_repo() { # kind name version (name: mise tool or Jupyter package)
   local have=""
   case "$1" in
-    tool) have="$(awk -v h="[[tools.\"$2\"]]" '/^\[\[tools\."/{cur=($0 == h)} cur && /^version = /{gsub(/"/,"",$3); print $3; exit}' "$MISE_LOCK")" ;;
+    tool) have="$(awk -v t="$2" '/^\[\[tools\./{h=$0; gsub(/"/,"",h); cur=(h == "[[tools." t "]]")} cur && /^version = /{gsub(/"/,"",$3); print $3; exit}' "$MISE_LOCK")" ;;
     jupyter) have="$(awk -v p="$2" '$0=="[[package]]"{n=""} /^name = /{gsub(/"/,"",$3); n=$3} n==p && /^version = /{gsub(/"/,"",$3); print $3; exit}' "$JUPYTER_PROJECT/uv.lock")" ;;
   esac
   [ -n "$have" ] || return 1
@@ -837,7 +1184,7 @@ git_fetch_quiet() {
 
 # cmd_daily <folder>: called by dev, goes online at most once a day
 cmd_daily() {
-  local dir="${1:-}" behind last days
+  local dir="${1:-}" behind last days checked web
   load_profile "" 2>/dev/null || return 0
   [ "$CHECK" = daily ] || return 0
   if [ -n "$(find "$CACHE_DIR/check.stamp" -mmin -1440 2>/dev/null)" ]; then # checked within the last day
@@ -850,8 +1197,13 @@ cmd_daily() {
       offer_fixes "$CACHE_DIR/check.txt"
       summarize "$CACHE_DIR/check.txt"
     else
-      if [ -n "$dir" ] && [ -f "$dir/uv.lock" ]; then ok "No known vulnerabilities in tools, Jupyter and the project."
-      else ok "No known vulnerabilities in tools and Jupyter."; fi
+      # name what run_check looked at
+      web=""
+      if has_module web && web_installed; then web=1; fi
+      if [ -n "$dir" ] && [ -f "$dir/uv.lock" ]; then checked="tools, Jupyter${web:+, the web language servers} and the project"
+      elif [ -n "$web" ]; then checked="tools, Jupyter and the web language servers"
+      else checked="tools and Jupyter"; fi
+      ok "No known vulnerabilities in $checked."
     fi
   else
     warn "The check did not finish (is OSV.dev reachable?), checking again next time."
@@ -877,6 +1229,7 @@ cmd_apply() {
   if [ "${1:-}" = "-y" ]; then yes=1; shift; fi
   load_profile "${1:-}"
   check_system
+  check_dotnet
   cmd_plan "$PROFILE"
   if [ -z "$yes" ]; then ask "Set it up like this?" || die "Cancelled, nothing changed."; fi
   install_mise
@@ -885,6 +1238,23 @@ cmd_apply() {
   install_tools
   setup_git
   install_nvim_plugins
+  if has_module web; then
+    say "Web language servers"
+    mise_env
+    web_current || web_summary
+    sync_web
+    ok "Web language servers match the lockfile"
+  fi
+  if has_module dotnet; then
+    say ".NET tools"
+    if dotnet_usable; then
+      sync_dotnet_tools
+      ok ".NET tools match envs/dotnet/tools.txt"
+    else
+      warn "No .NET SDK 10 or newer on this machine, so the .NET tools are NOT installed (the C# language server needs that runtime)."
+      echo "   C# in Neovim stays at syntax highlighting. Install the SDK, then run 'samebench apply' again." >&2
+    fi
+  fi
   if has_module python && [ "$JUPYTER" != no ]; then
     if jupyter_installed; then
       say "Jupyter tool"
@@ -905,16 +1275,23 @@ cmd_apply() {
   fi
 }
 
+# update_step <title>: the next numbered step of cmd_update (step and steps are its variables)
+update_step() { step=$((step + 1)); say "$step/$steps $1"; }
+
 cmd_update() {
   load_profile ""
   need_mise
+  local lock="$SAMEBENCH_REPO/config/nvim/lazy-lock.json" keep bad steps=2 step=0 details
+  # The two uv steps run when uv is there, which the python module brings
+  if has_module python || command -v uv >/dev/null 2>&1; then steps=$((steps + 2)); fi
+  if has_module web; then steps=$((steps + 1)); fi
+  if has_module dotnet; then steps=$((steps + 1)); fi
   say "UPDATE DAY: pulling new versions (at least 7 days old) into the lockfiles"
-  say "1/4 Tools (mise)"
+  update_step "Tools (mise)"
   lock_tools --bump
   (cd "$HOME" && mise install --locked)
-  say "2/4 Neovim plugins (newest commits that are at least 7 days old)"
+  update_step "Neovim plugins (newest commits that are at least 7 days old)"
   mise_env
-  local lock="$SAMEBENCH_REPO/config/nvim/lazy-lock.json" keep bad
   keep="$(mktemp)"
   for _ in 1 2; do # the second round covers plugins that a new LazyVim version added
     SAMEBENCH_MODULES="all" nvim --headless "+Lazy! check" "+luafile $SAMEBENCH_REPO/libexec/lock-plugins.lua" +qa
@@ -935,29 +1312,55 @@ cmd_update() {
   [ -z "$bad" ] ||
     die "The Neovim plugins do NOT match lazy-lock.json (first one: $bad), run 'samebench update' again."
   if command -v uv >/dev/null 2>&1; then
-    say "3/4 Jupyter tool (envs/jupyter)"
+    update_step "Jupyter tool (envs/jupyter)"
     ensure_tool_python # uv needs a Python to work the versions out, also when the tool is not installed
     uv lock --upgrade --project "$JUPYTER_PROJECT"
     if jupyter_installed; then sync_jupyter; fi
-    say "4/4 Python versions from uv (security patches within each version)"
+    update_step "Python versions from uv (security patches within each version)"
     if [ -n "$(uv python list --only-installed --managed-python 2>/dev/null)" ]; then
       uv python upgrade
     else
       ok "no Python versions installed by uv"
     fi
   fi
+  # Needs npm, so only a machine with the web module updates this list. Versions move within
+  # the ranges of envs/web/package.json, a new major is a deliberate change there.
+  if has_module web; then
+    update_step "Web language servers (envs/web)"
+    need_npm
+    lock_web update
+    if web_installed; then sync_web; fi
+  fi
+  # The .NET tools have no lockfile that a program could move within a range. Their versions
+  # are raised by hand in envs/dotnet/tools.txt, so this step only shows what the feed has.
+  if has_module dotnet; then
+    update_step ".NET tools (envs/dotnet/tools.txt, this step only shows versions and changes nothing)"
+    if command -v dotnet >/dev/null 2>&1; then
+      (cd "$HOME" && nvim -l "$SAMEBENCH_REPO/libexec/dotnet-tool-news.lua" "$DOTNET_TOOLS_FILE") ||
+        warn "The NuGet feed could not be asked, the pinned versions stay as they are."
+    else
+      warn "dotnet is missing, so the NuGet feed can't be asked. The pinned versions stay as they are."
+    fi
+    echo "   To take a newer version, put it into envs/dotnet/tools.txt (at least 7 days old) and run"
+    echo "   'samebench apply'. EasyDotnet is the server of easy-dotnet.nvim, which moved with the plugins"
+    echo "   above. Both have to share a major version, 'samebench doctor' compares them."
+  fi
   echo
   say "Review the changes (version jumps, changelogs if needed):"
   git -C "$SAMEBENCH_REPO" --no-pager diff --stat
+  details="config/mise-global/mise.lock config/nvim/lazy-lock.json envs/jupyter/uv.lock"
+  if has_module web; then details="$details envs/web/package-lock.json"; fi
+  printf '\n  Details:   git diff %s\n' "$details"
   cat <<'EOF'
-
-  Details:   git diff config/mise-global/mise.lock config/nvim/lazy-lock.json envs/jupyter/uv.lock
   Plugins:   in Neovim, :Lazy → "Log" shows the latest commits per plugin
   Test:      dev ~/some/project, click through briefly (with -j for Jupyter)
   Then:      git commit -am "Build: update locked versions" && git push
   Other machines: samebench sync
   mise itself:    put the new version and checksums at the top of bin/samebench (see the docs)
 EOF
+  if has_module dotnet; then
+    echo "  .NET tools:     not part of this diff, you raise them by hand in envs/dotnet/tools.txt (see the step above)"
+  fi
 }
 
 cmd_sync() {
@@ -1025,11 +1428,16 @@ cmd_doctor() {
   echo "Modules:  $MODULES"
   echo "Layout:   $LAYOUT   agent: ${AGENT_CMD:--}   Jupyter: $JUPYTER   Python downloads: $UV_PYTHON_DOWNLOADS"
   echo "Updates:  check $CHECK   maintains lockfiles: $UPDATER   signature check: $([ -s "$STATE_DIR/allowed_signers" ] && echo on || echo off)"
+  if runs_project_code; then
+    if [ "$TRUST" = all ]; then echo "Trust:    all (project code runs in the editor in every folder, without a question)"
+    else echo "Trust:    ask   trusted folders: $(awk '/^\//{n++} END{print n+0}' "$TRUST_STORE" 2>/dev/null || echo 0)"; fi
+  fi
+  if has_module dotnet; then echo ".NET:     wanted SDK versions: ${DOTNET_SDK:--}"; fi
   [ -s "$STATE_DIR/local-patches" ] && warn "Deviates locally (security patches not in the repository yet): $(tr '\n' ' ' <"$STATE_DIR/local-patches")"
   echo
   eval "$(cd "$HOME" && mise env -s bash 2>/dev/null)" || true
-  local t
-  for t in mise nvim tmux lazygit rg fd tree-sitter uv ruff ty git "$AGENT_CMD"; do
+  local t ver have client
+  for t in mise nvim tmux lazygit rg fd tree-sitter uv ruff ty $(has_module web && echo "node npm") git "$AGENT_CMD"; do
     [ -n "$t" ] || continue
     if command -v "$t" >/dev/null 2>&1; then ok "$(printf '%-12s' "$t") $(command -v "$t")"
     else warn "$(printf '%-12s' "$t") missing"; fi
@@ -1042,6 +1450,50 @@ cmd_doctor() {
     if jupyter_installed; then ok "Jupyter tool  $JUPYTER_VENV"
     elif [ "$JUPYTER" = no ]; then ok "Jupyter tool  turned off (JUPYTER=\"no\")"
     else ok "Jupyter tool  not installed (installed on the first 'dev -j')"; fi
+  fi
+  if has_module web; then
+    if web_current; then ok "Web servers   $WEB_ENV"
+    elif web_installed; then warn "Web servers   differ from envs/web/package-lock.json. Fix: samebench apply"
+    else warn "Web servers   not installed. Fix: samebench apply"; fi
+    if web_installed; then
+      for t in $WEB_SERVERS; do
+        [ -x "$WEB_ENV/node_modules/.bin/$t" ] || warn "$(printf '%-12s' "$t") missing in $WEB_ENV"
+      done
+    fi
+    [ -s "$WEB_PROJECT/package-lock.json" ] && ok "package-lock.json present (envs/web)" || warn "envs/web/package-lock.json missing"
+  fi
+  if has_module dotnet; then
+    t="$(dotnet_sdks | tr '\n' ' ' | sed 's/ $//')"
+    if [ -n "$t" ]; then ok ".NET SDK      $t ($(command -v dotnet), from the system)"
+    else warn ".NET SDK      missing. The system provides it, see the installation guide"; fi
+    for ver in $DOTNET_SDK; do
+      [ -z "$t" ] || dotnet_has_sdk "$ver" || warn ".NET SDK $ver missing (wanted in DOTNET_SDK)"
+    done
+    if [ -n "$t" ] && ! dotnet_usable; then warn ".NET SDK      older than 10, the C# language server needs the runtime of .NET 10 or newer"; fi
+    if [ -s "$DOTNET_TOOLS_FILE" ]; then
+      ok "tools.txt present (envs/dotnet)"
+      dotnet_tools_list | while read -r t ver; do
+        have="$(dotnet_tool_version "$t")"
+        if dotnet_tool_at "$t" "$ver"; then ok "$(printf '%-13s' ".NET tool") $t $ver"
+        elif [ -n "$have" ]; then warn "$(printf '%-13s' ".NET tool") $t $have is installed, $ver is pinned. Fix: samebench apply"
+        else warn "$(printf '%-13s' ".NET tool") $t $ver not installed. Fix: samebench apply (needs a .NET SDK 10 or newer)"; fi
+        # easy-dotnet.nvim only talks to a server of its own major version
+        if [ "$t" = EasyDotnet ]; then
+          client="$(sed -n 's/.*clientInfo = {[^}]*version = "\([0-9][0-9]*\)\..*/\1/p' \
+            "$DATA_HOME/$NVIM_APP/lazy/easy-dotnet.nvim/lua/easy-dotnet/rpc/dotnet-client.lua" 2>/dev/null | head -1)"
+          if [ -n "$client" ] && [ "${ver%%.*}" != "$client" ]; then
+            warn "EasyDotnet $ver is pinned, but the locked easy-dotnet.nvim expects major version $client. Pin both to the same major."
+          fi
+        fi
+      done
+      if dotnet_tools_current; then
+        for t in $DOTNET_COMMANDS; do
+          [ -x "$DOTNET_TOOLS/$t" ] || warn "$(printf '%-13s' "$t") missing in $DOTNET_TOOLS"
+        done
+      fi
+    else
+      warn "envs/dotnet/tools.txt missing"
+    fi
   fi
   [ -s "$MISE_LOCK" ] && ok "mise.lock present" || warn "mise.lock missing"
   [ -s "$SAMEBENCH_REPO/config/nvim/lazy-lock.json" ] && ok "lazy-lock.json present" || warn "lazy-lock.json missing"
@@ -1066,14 +1518,21 @@ leftover_list() {
 
 # The way back: remove everything samebench set up
 cmd_remove() {
-  local yes="" pair dst f backup
+  local yes="" pair dst f backup extra
   [ "${1:-}" = "-y" ] && yes=1
   say "This removes what samebench set up:"
   echo "   · the line for samebench in ~/.zshrc and ~/.bashrc"
   echo "   · git: include.path, '*.ipynb diff=samebench-ipynb', '.*.nb.py' (global config)"
   echo "   · links: ~/.config/$NVIM_APP, ~/.config/mise/{config.toml,mise.lock,conf.d/*}, backups (.backup-*) come back"
   echo "   · ~/.config/samebench (except local.sh and allowed_signers) and running dev sessions (tmux -L samebench)"
-  echo "   Programs, data and caches (mise, plugins, Jupyter) are asked about separately afterwards."
+  if [ -s "$TRUST_STORE" ]; then
+    echo "   · the list of project folders you trusted (~/.config/samebench/trusted)"
+  fi
+  # remove loads no profile, so the folders say which optional parts are on this machine
+  extra=""
+  if [ -d "$WEB_ENV" ]; then extra="$extra, web language servers"; fi
+  if [ -d "$DOTNET_TOOLS" ]; then extra="$extra, .NET tools"; fi
+  echo "   Programs, data and caches (mise, plugins, Jupyter$extra) are asked about separately afterwards."
   if [ -z "$yes" ]; then ask "Remove it now?" || die "Cancelled, nothing changed."; fi
   remove_line "$RC_LINE" "$HOME/.zshrc"
   remove_line "$RC_LINE" "$HOME/.bashrc"
@@ -1111,6 +1570,21 @@ EOF
   fi
   echo "     (Python versions and the package cache of uv live in ~/.local/share/uv and ~/.cache/uv,"
   echo "      they belong to uv and stay)"
+  if [ -d "$HOME/.npm" ]; then
+    echo "     (the package cache of npm lives in ~/.npm, it belongs to npm and stays)"
+  fi
+  if [ -d "$HOME/.nuget" ] || [ -d "$HOME/.dotnet" ]; then
+    echo "     (the .NET SDK belongs to your system, ~/.dotnet and the package cache in ~/.nuget belong to"
+    echo "      dotnet, they stay)"
+  fi
+  # What the EasyDotnet server and the C# language server wrote for themselves (logs, caches,
+  # remembered choices, Microsoft's telemetry ids). Other .NET tools may share these folders.
+  for f in "$HOME/Library/Application Support/EasyDotnet" "$HOME/Library/Application Support/easy-dotnet" \
+    "$HOME/Library/Application Support/Microsoft/VisualStudio/Roslyn" "$HOME/Library/Application Support/Microsoft DevDiv" \
+    "$DATA_HOME/EasyDotnet" "$DATA_HOME/easy-dotnet" "$CONFIG_HOME/EasyDotnet" "$CONFIG_HOME/easy-dotnet" \
+    "${XDG_CACHE_HOME:-$HOME/.cache}/EasyDotnet"; do
+    if [ -e "$f" ]; then echo "     ($f holds logs, caches or ids of the .NET language servers, it stays)"; fi
+  done
   for f in "${XDG_CACHE_HOME:-$HOME/.cache}/tree-sitter" "${XDG_CACHE_HOME:-$HOME/.cache}/ty" \
     "${XDG_CACHE_HOME:-$HOME/.cache}/sigstore-rust" "$HOME/Library/Caches/dev.sigstore.sigstore-rust"; do
     if [ -e "$f" ]; then echo "     ($f is a small cache that other programs may share, it stays)"; fi

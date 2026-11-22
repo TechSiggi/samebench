@@ -2,7 +2,7 @@
 
 # Cheat sheet
 
-**Neovim** &nbsp;·&nbsp; **tmux** &nbsp;·&nbsp; **lazygit** &nbsp;·&nbsp; **Notebooks**
+**Neovim** &nbsp;·&nbsp; **tmux** &nbsp;·&nbsp; **lazygit** &nbsp;·&nbsp; **Notebooks** &nbsp;·&nbsp; **.NET**
 
 <sub><kbd>Space</kbd> is the leader key. Press it, wait a moment, and which-key shows what comes next.<br>
 Inside Neovim, <kbd>Space</kbd> <kbd>H</kbd> opens the <a href="quickref.md">short version</a> of this page.</sub>
@@ -105,6 +105,20 @@ Start the session with `dev -j`. The keys below work in every notebook.
 
 `:w` saves back into the `.ipynb` and keeps the outputs. Before typing in the browser, use
 *File → Reload Notebook from Disk*.
+
+### .NET
+
+These keys exist with the [`dotnet` module](configuration.md#the-dotnet-module) in a folder you trusted. Completion,
+go to definition, rename and quick fixes use the same keys as everywhere else.
+
+| Keys | Action | | Keys | Action |
+|---|---|---|---|---|
+| <kbd>Space</kbd> <kbd>D</kbd> <kbd>b</kbd> | Build | | <kbd>Space</kbd> <kbd>D</kbd> <kbd>t</kbd> | Open the test runner |
+| <kbd>Space</kbd> <kbd>D</kbd> <kbd>r</kbd> | Run a project | | <kbd>Space</kbd> <kbd>D</kbd> <kbd>T</kbd> | Run the tests |
+| <kbd>Space</kbd> <kbd>D</kbd> <kbd>R</kbd> | Restore packages | | <kbd>Space</kbd> <kbd>D</kbd> <kbd>d</kbd> | Diagnostics of the whole solution |
+
+`:Dotnet` followed by <kbd>Tab</kbd> lists everything else, such as `:Dotnet add`, `:Dotnet new`,
+`:Dotnet outdated` and `:Dotnet secrets`.
 
 ### Commands
 

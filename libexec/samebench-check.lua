@@ -1,12 +1,13 @@
 -- Security check for samebench. Runs with `nvim -l` (Neovim is there anyway) and
 -- only needs curl, no further dependencies.
 --
---   nvim -l samebench-check.lua <repo> <jupyter-venv> <output> [project folder]
+--   nvim -l samebench-check.lua <repo> <jupyter-venv> <output> [project folder] [web folder]
 --
 -- Asks OSV.dev (an open vulnerability database that includes the GitHub
 -- security advisories and PyPI) about the INSTALLED versions of
 --   * the tools in mise.lock (where OSV has a matching package)
 --   * the Jupyter tool (the packages installed in its environment)
+--   * the web language servers (the npm packages installed in their folder, a note only)
 --   * optionally a project's uv.lock (a note only, never changed)
 -- Only package names and versions are sent, and from a project only the
 -- packages that come from PyPI. The project's own name and packages from
@@ -14,14 +15,17 @@
 --
 -- Output: one line per finding, fields separated by "|":
 --   severity|kind|ecosystem|package|version|id|fixed-in|summary|tool
--- kind = tool | jupyter | project; tool = mise name (only for kind=tool)
+-- kind = tool | jupyter | web | project; tool = mise name (only for kind=tool)
 -- Exit 0 = checked (file written), 2 = no complete answer from OSV.dev.
 
-local repo, venv, out_file, project = arg[1], arg[2], arg[3], arg[4]
+local repo, venv, out_file, project, web = arg[1], arg[2], arg[3], arg[4], arg[5]
 local API = "https://api.osv.dev/v1"
 
--- mise tool to OSV package (Neovim and tmux have no matching package there)
+-- mise tool to OSV package (Neovim and tmux have no matching package there).
+-- OSV has no ecosystem for Node.js itself. The Bitnami one lists the advisories of the
+-- Node.js project by Node version, with the version that fixes each of them.
 local TOOL_MAP = {
+  ["node"] = { "Bitnami", "node" },
   ["aqua:astral-sh/uv"] = { "PyPI", "uv" },
   ["aqua:astral-sh/ruff"] = { "PyPI", "ruff" },
   ["aqua:astral-sh/ty"] = { "PyPI", "ty" },
@@ -94,9 +98,10 @@ local items = {} -- { kind, eco, name, version, tool }
 local lock = read(repo .. "/config/mise-global/mise.lock") or ""
 local current
 for line in lock:gmatch("[^\n]+") do
-  local t = line:match('^%[%[tools%."([^"]+)"%]%]')
+  -- [[tools."aqua:owner/name"]], or without quotes for the core backend: [[tools.node]]
+  local t = line:match("^%[%[tools%.(.-)%]%]$")
   if t then
-    current = t
+    current = t:gsub('"', "")
   elseif current and line:match("^version = ") then
     local v = line:match('"([^"]+)"')
     local m = TOOL_MAP[current]
@@ -113,6 +118,21 @@ if venv and venv ~= "" then
     local n, v = vim.fn.fnamemodify(d, ":t"):match("^(.+)%-([^%-]+)%.dist%-info$")
     if n then
       table.insert(items, { "jupyter", "PyPI", norm(n), v, "" })
+    end
+  end
+end
+
+-- Web language servers: the npm packages actually installed (npm records them in
+-- node_modules/.package-lock.json), every name and version once
+if web and web ~= "" then
+  local ok, tree = pcall(vim.json.decode, read(web .. "/node_modules/.package-lock.json") or "")
+  local seen = {}
+  for path, pkg in pairs(ok and type(tree) == "table" and type(tree.packages) == "table" and tree.packages or {}) do
+    local n = path:match("^.*node_modules/(.+)$")
+    local v = type(pkg) == "table" and not pkg.link and pkg.version
+    if n and type(v) == "string" and not seen[n .. "@" .. v] then
+      seen[n .. "@" .. v] = true
+      table.insert(items, { "web", "npm", n, v, "" })
     end
   end
 end
@@ -193,7 +213,9 @@ for idx, ids in pairs(found) do
       end
     end
     if not dup then
-      local sev = (v.database_specific and v.database_specific.severity) or "UNKNOWN"
+      -- GitHub writes HIGH and MODERATE, Bitnami writes High and Medium
+      local sev = tostring((v.database_specific and v.database_specific.severity) or "UNKNOWN"):upper()
+      sev = sev == "MEDIUM" and "MODERATE" or sev
       local fixed
       for _, a in ipairs(v.affected or {}) do
         local pn = a.package and a.package.name or ""

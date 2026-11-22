@@ -20,7 +20,9 @@
 
 Samebench turns a Mac, a Linux machine or a WSL install into the same terminal workspace. You get Neovim with
 LazyVim, tmux, lazygit and an AI coding agent side by side, plus Jupyter notebooks that share a kernel between your
-editor and the browser. Everything it installs comes from a pinned list and waits for your yes.
+editor and the browser. Two optional modules add what a full-stack project needs. One brings Node.js and the
+language servers for TypeScript and Angular frontends, the other C# editing for .NET backends. Everything it
+installs comes from a pinned list and waits for your yes.
 
 <p align="center">
   <img alt="The three layouts started by dev: code, agent and code with Jupyter" src="docs/assets/layouts.svg" width="100%">
@@ -32,9 +34,9 @@ editor and the browser. Everything it installs comes from a pinned list and wait
 
 ### Secure by default
 
-Every tool, plugin and Jupyter package is pinned in a lockfile, and nothing installs before you say yes. New
-versions have to be at least seven days old, and a daily check tells you about known vulnerabilities right when
-you start working.
+Every tool, plugin, language server and Jupyter package is pinned in a lockfile, and nothing installs before you
+say yes. New versions have to be at least seven days old, and a daily check tells you about known
+vulnerabilities right when you start working.
 
 </td>
 <td width="50%" valign="top">
@@ -127,6 +129,8 @@ what WSL processes can reach on the Windows side.
 | `dev -j` with a shared Jupyter kernel | ✅ | ✅ | ✅ | ✅ |
 | `jlab` opens your browser | ✅ | ✅ | ✅ | prints a clickable link |
 | Python installed by uv when needed | ✅ | ✅ | ✅ | ✅ |
+| TypeScript and Angular editing with the [`web` module](docs/configuration.md#the-web-module) | ✅ | not tested yet | not tested yet | not tested yet |
+| C# editing with the [`dotnet` module](docs/configuration.md#the-dotnet-module) | ✅ | not tested yet | not tested yet | not tested yet |
 | Nerd Font for the icons, set in | your terminal | your terminal | Windows Terminal | your local terminal |
 
 ## A day with it
@@ -155,13 +159,19 @@ and the [notebook guide](docs/notebooks.md) walk through all of it.
 ## Security in one picture
 
 <p align="center">
-  <img alt="Six pinned lists, each wired to the question that comes before its install: samebench apply asks once for mise, the tools and the plugins, and dev -j asks for the Jupyter tool, the project's packages and Python" src="docs/assets/supply-chain.svg" width="100%">
+  <img alt="Ten sources, each wired to the question that comes before it, in the order the questions come. samebench apply first asks before apt installs the .NET SDK from your system, then shows its plan and asks once for mise, the tools, the plugins, the web language servers and the .NET tools. dev -j first asks whether you trust the folder before the editor may load the project's own code, then asks for the Jupyter tool, the project's packages and Python. The .NET SDK and the project's code are drawn dashed because they are not pinned lists" src="docs/assets/supply-chain.svg" width="100%">
 </p>
 
-The tools, plugins and packages this setup installs come from pinned lists, and every install waits for your yes.
-`samebench apply` shows its plan first, and `dev -j` asks before it installs the Jupyter tool, a project's packages
-or a Python version. Nothing installs itself in the background. Mason, the prebuilt completion binary, tmux plugins
-and every `curl | sh` installer are switched off on purpose.
+The tools, plugins, language servers and packages this setup installs come from pinned lists, and every install
+waits for your yes. `samebench apply` shows its plan first, and `dev -j` asks before it installs the Jupyter tool,
+a project's packages or a Python version. Nothing installs itself in the background. Mason, the prebuilt
+completion binary, tmux plugins and every `curl | sh` installer are switched off on purpose.
+
+Two things in the picture are not pinned lists. The .NET SDK of the `dotnet` module comes from your system, as a
+signed package of the distribution or as Microsoft's signed installer, and `samebench apply` asks before apt
+installs it. And with the `web` and `dotnet` modules, the editor only loads code from a project after you have
+told `dev` that you trust the folder. That covers a project's own TypeScript, ESLint and prettier, and the C#
+language server, which runs build targets from the project.
 
 The lists change on one machine, in one commit you can read, and an update only takes versions that are at least
 seven days old. If you sign your commits, `samebench sync` refuses anything you did not sign. A repository you
@@ -202,7 +212,7 @@ The full story is in [updates and security](docs/updates-and-security.md).
 | <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>d</kbd> | Leave the session, it keeps running |
 | <kbd>Space</kbd> <kbd>H</kbd> | Open the short cheat sheet inside Neovim |
 
-The [full cheat sheet](docs/cheatsheet.md) covers Neovim, tmux, lazygit and notebooks.
+The [full cheat sheet](docs/cheatsheet.md) covers Neovim, tmux, lazygit, notebooks and .NET.
 
 </details>
 

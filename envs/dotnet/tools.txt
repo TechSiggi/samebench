@@ -1,0 +1,17 @@
+# .NET tools for the "dotnet" module, managed by `samebench`.
+#
+# One tool per line: <package id> <exact version>. `samebench apply` installs exactly these with
+# `dotnet tool` into ~/.local/share/samebench/dotnet-tools, from the feed in your NuGet
+# configuration (nuget.org unless you changed it). Only Neovim has that folder on its PATH.
+#
+# Both are pinned because they would otherwise install themselves unpinned: easy-dotnet.nvim
+# installs EasyDotnet when it is missing, and EasyDotnet installs roslyn-language-server.
+#
+# New versions are raised here by hand, at least 7 days old, and EasyDotnet together with the
+# easy-dotnet.nvim commit in config/nvim/lazy-lock.json (the plugin and its server have to
+# share a major version). `samebench update` shows what is new and changes nothing.
+
+# the server behind easy-dotnet.nvim (command: dotnet-easydotnet)
+EasyDotnet 3.4.38
+# the C# language server (Roslyn), started by EasyDotnet. Microsoft only publishes prereleases.
+roslyn-language-server 5.13.0-1.26514.10

@@ -44,6 +44,16 @@ Full version with everything: docs/cheatsheet.md
 | `Space jc / jm` | new code / markdown cell                |
 | `:w`            | save back into the .ipynb               |
 
+## .NET (module `dotnet`, in a trusted folder)
+
+| Keys            | Action                                  |
+|-----------------|-----------------------------------------|
+| `Space Db / Dr` | build / run a project                   |
+| `Space Dt / DT` | test runner / run the tests             |
+| `Space DR`      | restore packages                        |
+| `Space Dd`      | diagnostics of the whole solution       |
+| `:Dotnet`       | everything else, `Tab` lists it         |
+
 ## lazygit
 
 | Keys            | Action                                  |

@@ -1,0 +1,11 @@
+{
+  "name": "samebench-web-lsp",
+  "private": true,
+  "description": "Language servers for the samebench web module. No scripts, installed with npm ci --ignore-scripts, see bin/samebench.",
+  "dependencies": {
+    "@angular/language-server": "^22.0.0",
+    "@vtsls/language-server": "^0.3.0",
+    "typescript": "~6.0.3",
+    "vscode-langservers-extracted": "^4.10.0"
+  }
+}

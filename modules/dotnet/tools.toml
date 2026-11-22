@@ -1,0 +1,8 @@
+# Module "dotnet", optional, for C# and .NET backends.
+# No tool of this module comes through mise. The .NET SDK comes from your system (the signed
+# Ubuntu archive or Microsoft's signed installer for macOS), because mise installs it without
+# verifying a checksum. The two .NET tools that Neovim needs are pinned in envs/dotnet/tools.txt
+# and installed by `samebench apply` with `dotnet tool`.
+# The file exists so that "dotnet" is a module like the others.
+
+[tools]

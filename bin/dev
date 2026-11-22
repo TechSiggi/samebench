@@ -8,7 +8,7 @@
 #   -l layout  choose the layout (otherwise the profile's, default: code)
 #   -j         add Jupyter: project packages via uv (asks once per uv.lock), a kernel
 #              from the project's .venv and JupyterLab in the "jupyter" window
-#   -r         stop the running session and rebuild it (other layout, -j)
+#   -r         stop the running session and rebuild it (other layout, -j, trust asked again)
 #
 # Layouts:
 #   code   Neovim on top, terminal bottom left, agent bottom right   (default)
@@ -109,6 +109,87 @@ if tmux has-session -t "=$name" 2>/dev/null; then
   fi
 fi
 
+# ----------------------------------------------------------------- Trust ---
+# The language servers and formatters of some modules can load code from the project they
+# work on. They only do that in a folder you trusted, and dev asks once per folder when it
+# builds a session. The answer reaches Neovim as SAMEBENCH_TRUSTED and SAMEBENCH_TRUSTED_DIR
+# (see lua/samebench/trust.lua).
+has_module() { case " ${SAMEBENCH_MODULES:-core} " in *" $1 "*) return 0 ;; esac; return 1; }
+
+# project_has <name...>: is a file with one of these names in the folder, at most three levels
+# down? Never looks into node_modules, .git, dist, bin and obj.
+project_has() {
+  local names=() n
+  for n in "$@"; do names+=(-o -name "$n"); done
+  [ -n "$(find "$dir" -mindepth 1 -maxdepth 3 \( -name node_modules -o -name .git -o -name dist -o -name bin -o -name obj \) -prune \
+    -o -type f \( "${names[@]:1}" \) -print -quit 2>/dev/null)" ]
+}
+
+# code_project: is this a project of an active module whose editor tools can run its code?
+# Sets trust_yes and trust_no, what each answer means. A module adds its lines here.
+code_project() {
+  trust_yes="" trust_no=""
+  if has_module web && project_has package.json angular.json nx.json tsconfig.json; then
+    trust_yes="${trust_yes}    With a yes, TypeScript and Angular use the project's own TypeScript, its Angular language service,
+    tsserver plugins from tsconfig.json, and ESLint and prettier with their configuration."$'\n'
+    trust_no="${trust_no}    TypeScript and Angular then get the servers of samebench only, without ESLint and prettier."$'\n'
+  fi
+  if has_module dotnet && project_has '*.sln' '*.slnx' '*.csproj' '*.fsproj'; then
+    trust_yes="${trust_yes}    With a yes, the C# language server loads the project, which evaluates its MSBuild files and runs
+    build targets from the folder."$'\n'
+    trust_no="${trust_no}    C# then gets syntax highlighting only, without a language server."$'\n'
+  fi
+  [ -n "$trust_yes" ]
+}
+
+# The list of trusted folders, one absolute path per line. A folder covers its subfolders.
+# Lines are compared as plain text, never as patterns. Sets trusted_dir to the line that matched.
+trust_store="$HOME/.config/samebench/trusted"
+folder_trusted() {
+  local t
+  [ -f "$trust_store" ] || return 1
+  while IFS= read -r t || [ -n "$t" ]; do
+    case "$t" in /*) ;; *) continue ;; esac
+    if [ "$t" != / ]; then t="${t%/}"; fi
+    if [ "$dir" = "$t" ]; then trusted_dir="$t"; return 0; fi
+    case "$dir" in "${t%/}"/*) trusted_dir="$t"; return 0 ;; esac
+  done <"$trust_store"
+  return 1
+}
+
+# trusted_dir is the folder the trust belongs to. Neovim compares it with the folder it was
+# started in, so a shell of this session that moves somewhere else does not take the trust
+# along. It stays empty with TRUST="all", where every folder is trusted.
+trusted=0 trusted_dir=""
+if [ "${SAMEBENCH_TRUST:-ask}" = all ]; then
+  trusted=1
+elif folder_trusted; then
+  trusted=1
+elif code_project; then
+  if [ "$dir" = / ] || [ "$dir" = "$(cd "$HOME" 2>/dev/null && pwd -P)" ]; then
+    # A yes covers every folder below, which here would be every project on the machine
+    warn "This is your home folder or the root folder. A yes would cover every folder below it, so dev does not ask here. It stays untrusted."
+  else
+    case "$dir" in
+      *$'\n'*)
+        warn "This folder has a line break in its name, which the list of trusted folders can't hold. It stays untrusted."
+        ;;
+      *)
+        # The name belongs to the folder, so control characters in it never reach the terminal
+        warn "The language servers and formatters can load code from this folder: $(printf '%s' "$dir" | LC_ALL=C tr -d '[:cntrl:]')"
+        printf '%s    With a no the session opens all the same.\n%s' "$trust_yes" "$trust_no" >&2
+        if ask "Trust this folder and every folder below it?"; then
+          if mkdir -p "${trust_store%/*}" && printf '%s\n' "$dir" >>"$trust_store"; then
+            trusted=1 trusted_dir="$dir"
+          else
+            warn "Could not write $trust_store, the folder stays untrusted."
+          fi
+        fi
+        ;;
+    esac
+  fi
+fi
+
 # --------------------------------------------------------------- Jupyter ---
 kernel_path=""
 if [ -n "$jupyter" ]; then
@@ -183,7 +264,10 @@ fi
 
 # The project environment (.venv) is active in the whole session: Neovim (ruff, ty), agent, shell.
 # SAMEBENCH_SESSION=1 makes env.sh load the full environment here (also with activation "dev").
-envargs=(-e "SAMEBENCH_REPO=$SAMEBENCH_REPO" -e "SAMEBENCH_SESSION=1" -e "NVIM_APPNAME=samebench-nvim")
+# SAMEBENCH_TRUSTED and SAMEBENCH_TRUSTED_DIR always get a value: the tmux server keeps the
+# environment it was started with, and dev may be called from a session of a trusted folder.
+envargs=(-e "SAMEBENCH_REPO=$SAMEBENCH_REPO" -e "SAMEBENCH_SESSION=1" -e "NVIM_APPNAME=samebench-nvim"
+  -e "SAMEBENCH_TRUSTED=$trusted" -e "SAMEBENCH_TRUSTED_DIR=$trusted_dir")
 if venv_tracked; then
   warn "This repository tracks files in .venv, so that folder is not activated."
 elif [ -x "$dir/.venv/bin/python" ]; then

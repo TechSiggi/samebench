@@ -1,0 +1,10 @@
+# Module "web", optional, for TypeScript and Angular frontends.
+# Node.js comes from nodejs.org through the core backend of mise. mise takes the checksums from
+# the signed SHASUMS256.txt of the release, they are in config/mise-global/mise.lock.
+# The language servers do NOT go here but into their own environment envs/web
+# (package-lock.json with integrity hashes).
+# One major version on purpose, changing it is a deliberate decision. Projects keep their own
+# Angular version, npm packages and lockfile.
+
+[tools]
+"core:node" = "24" # runs the language servers, npm and the Angular CLI of your projects (LTS)

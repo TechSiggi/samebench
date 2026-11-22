@@ -13,7 +13,10 @@ platform you used. You will get an answer as soon as possible.
 
 - A way to make `samebench`, `dev` or `jlab` run or download something that is not pinned and verified
 - An install that happens without the question that should come before it
-- A way for a project, a notebook or a remote machine to execute code through these scripts
+- A way for a project, a notebook or a remote machine to execute code through these scripts, or through the
+  language servers and formatters of Neovim in a folder you have not trusted
+- A way to make the editor plugins or their servers install a program by themselves, for example the .NET tools
+  of the `dotnet` module in a version that is not the pinned one
 - JupyterLab, the kernel or a forwarded port becoming reachable from outside `127.0.0.1`
 - Anything that weakens the checks described in [updates and security](docs/updates-and-security.md)
 

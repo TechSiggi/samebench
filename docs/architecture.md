@@ -17,6 +17,7 @@ libexec/nb-convert           turns a notebook into Python cells and back, for Ne
 libexec/ipynb-textconv       notebook diffs for git, falls back to the plain file without Jupyter
 libexec/samebench-check.lua  vulnerability check against OSV.dev, runs with nvim -l and needs only curl
 libexec/lock-plugins.lua     holds the Neovim plugins to the seven day rule on update day
+libexec/dotnet-tool-news.lua shows on update day what the NuGet feed has for the pinned .NET tools
 profiles/                    mac.sh, linux.sh
 modules/<module>/tools.toml  tools per module, installed by mise
 config/mise-global/          mise settings and mise.lock
@@ -25,6 +26,8 @@ config/tmux/                 tmux.conf without plugins for the dev server, nerd.
 config/lazygit/              lazygit colours
 config/jupyter/              console colours
 envs/jupyter/                the Jupyter tool, pyproject.toml and uv.lock
+envs/web/                    the web language servers, package.json and package-lock.json
+envs/dotnet/                 the two .NET tools of the dotnet module, tools.txt with exact versions
 docs/                        this documentation
 ```
 
@@ -35,7 +38,7 @@ few short shell, Python and Lua files. There is no framework and no build step.
 
 ```mermaid
 flowchart TD
-    A["load the profile and local.sh"] --> B["check the system<br/>Apple tools or apt packages"]
+    A["load the profile and local.sh"] --> B["check the system<br/>Apple tools or apt packages,<br/>the .NET SDK with the dotnet module"]
     B --> C["show the plan and wait for yes"]
     C --> D["install mise<br/>pinned version, SHA-256 compared"]
     D --> E["link the configuration<br/>~/.config/samebench-nvim, mise"]
@@ -43,7 +46,9 @@ flowchart TD
     F --> G["mise install --locked"]
     G --> H["git settings for notebooks"]
     H --> I["Lazy! restore<br/>checkouts compared with lazy-lock.json"]
-    I --> J["Jupyter tool, if already installed or JUPYTER=yes"]
+    I --> K["web language servers, with the web module<br/>npm ci from package-lock.json"]
+    K --> L[".NET tools, with the dotnet module<br/>dotnet tool at the versions from tools.txt"]
+    L --> J["Jupyter tool, if already installed or JUPYTER=yes"]
 ```
 
 Nothing before the question changes the machine, apart from apt packages that `samebench` found missing and asked about
@@ -67,6 +72,42 @@ newest commits instead. `samebench apply` therefore keeps the pinned list aside 
 back when lazy.nvim changed it. At the end it compares the checkout of every plugin with its locked commit and
 stops when one is missing or differs.
 
+`lazy-lock.json` is one list for all machines, and it holds a plugin that only the `dotnet` module uses,
+easy-dotnet.nvim. lazy.nvim drops a plugin it does not know from the list whenever it writes the file, so a
+machine without that module would lose the pin and fail the comparison at the end. That is why
+`config/nvim/lua/plugins/modules.lua` names the plugin for every machine, without anything that loads it. It is
+checked out everywhere at its locked commit and stays on disk, unloaded. The file types, commands and keys that
+load it are in `lua/modules/dotnet.lua`, which is only part of the configuration with the `dotnet` module.
+
+With the `web` module, the language servers come next. npm would install into the folder that holds
+`package.json`, which is the repository. So `samebench apply` copies `package.json` and `package-lock.json` from
+`envs/web` into `~/.local/share/samebench/web-lsp` and runs `npm ci` there. `npm ci` installs exactly what the
+lockfile says, compares every package with its integrity hash and, with `--ignore-scripts`, runs no install
+script. samebench passes no registry, so npm uses the one from your own configuration. After an install that went
+through, a copy of the lockfile is stored next to it, and the next `samebench apply` skips the step while that copy
+and the repository's lockfile are the same. Neovim finds the folder through `SAMEBENCH_WEB_LSP` in `env.sh` and
+starts every server by its full path.
+
+With the `dotnet` module, the check of the system also compares `DOTNET_SDK` with `dotnet --list-sdks`. On Linux
+it offers the missing package through apt when `apt-cache policy` shows a candidate, and otherwise it only says
+where the version would come from. The two .NET tools follow after the web language servers. For each line of
+`envs/dotnet/tools.txt`, `samebench apply` runs `dotnet tool update --tool-path ~/.local/share/samebench/dotnet-tools
+<id> --version <version> --allow-downgrade`, which installs a missing tool and moves an existing one up or down
+to exactly that version. dotnet keeps each tool in `.store/<id>/<version>` below that folder, and a tool that
+already sits at its pinned version, and at no other, is skipped. The command runs in the home folder, because
+NuGet reads its configuration from the current folder upwards and a project folder could bring a feed of its
+own. It runs without the .NET banner. The first `dotnet` command on a machine also creates the ASP.NET
+development certificate, and `samebench` switches that off for its own calls, so the certificate is created by
+the first `dotnet` command you run yourself. The package id
+and the version only reach the command line when they consist of the characters such names are made of. Without
+an SDK of version 10 or newer the step is left out with a warning.
+
+Neovim finds the folder through `SAMEBENCH_DOTNET_TOOLS` and puts it on its own `PATH`, so no shell sees these
+tools. `config/nvim/lua/modules/dotnet.lua` registers the keys, commands and file types that load easy-dotnet.nvim
+only when the folder is trusted and both tools are in place. That second condition matters, because a plugin
+that loads without its server would install one. For the same reason the module writes the small file in which
+the plugin notes that its server is installed, before the plugin loads, so the plugin never runs its own check.
+
 `env.sh` has two parts. The first part always runs and only makes `samebench`, `dev`, `jlab` and mise reachable on the
 `PATH`. The second part activates mise, sets the editor and handles the project's `.venv`. With `ACTIVATE="dev"`
 that second part only runs inside `dev` sessions, which is how other shells stay untouched.
@@ -75,14 +116,15 @@ that second part only runs inside `dev` sessions, which is how other shells stay
 
 | Path | Content |
 |---|---|
-| `~/.config/samebench/` | profile name, `env.sh`, generated git and tmux snippets, `local.sh`, `allowed_signers` |
+| `~/.config/samebench/` | profile name, `env.sh`, generated git and tmux snippets, `local.sh`, `allowed_signers`, `trusted` with the project folders you trusted |
 | `~/.config/samebench-nvim` | link to `config/nvim` in this repository |
 | `~/.local/bin/mise` | the pinned mise |
 | `~/.local/share/samebench-nvim/` | Neovim plugins and parsers |
-| `~/.local/share/samebench/` | the Jupyter tool, kernel definitions per project, kernel overlays, approved project lockfiles |
+| `~/.local/share/samebench/` | the Jupyter tool, kernel definitions per project, kernel overlays, approved project lockfiles, the web language servers, the .NET tools |
 | `~/.local/share/mise/` | the tools from mise |
 | `~/.local/state/mise/`, `~/.cache/mise/`, on macOS also `~/Library/Caches/mise/` | state and cached downloads of mise |
 | `~/.cache/samebench/` | the result of the daily check |
+| `~/.dotnet/`, `~/.nuget/`, on macOS also folders below `~/Library/Application Support/` | with the `dotnet` module, what .NET and its language servers keep for themselves, such as the NuGet package cache, logs and caches. They are not part of this setup and stay when it is removed |
 
 The settings folder is always `~/.config/samebench`, also when `XDG_CONFIG_HOME` points somewhere else, because
 the line in `.zshrc` and `.bashrc` and the tmux configuration name that path. The links for mise and Neovim follow
@@ -90,6 +132,38 @@ the line in `.zshrc` and `.bashrc` and the tmux configuration name that path. Th
 
 Neovim runs with `NVIM_APPNAME=samebench-nvim`, which gives it its own configuration, data and cache folders. tmux runs as
 `tmux -L samebench -f config/tmux/tmux.conf`, a separate server that never reads `~/.tmux.conf`.
+
+## How `dev` decides about project code
+
+Some language servers and formatters can load code from the project they work on. With the `web` module that is
+the project's own TypeScript, its Angular language service, tsserver plugins and ESLint and prettier with their
+configuration. `config/nvim/lua/modules/web.lua` only allows it in a trusted folder. Everywhere else the
+restricted mode applies, in which only code from samebench's own folder runs. With the `dotnet` module it is the
+C# language server, which evaluates the MSBuild files of a project and runs build targets from it. There is no
+restricted mode for that, so `config/nvim/lua/modules/dotnet.lua` does not load the plugin at all without trust.
+
+Both files ask `config/nvim/lua/samebench/trust.lua`, and the rule exists only there. Neovim counts as trusted
+when `SAMEBENCH_TRUSTED` is `1` in its environment and it was started in the folder that `SAMEBENCH_TRUSTED_DIR`
+names, or below it. The folders are compared as plain text, and Neovim resolves links in its own folder first,
+as `dev` does. Every other value, and no value at all, means no.
+
+`dev` sets that variable when it builds a new session, never when it reopens a running one. A folder counts as
+trusted when it, or a folder above it, is a line in `~/.config/samebench/trusted`. The lines are compared as plain
+text. Otherwise `dev` looks for the files that mark a project of an active module. For `web` those are
+`package.json`, `angular.json`, `nx.json` and `tsconfig.json`, for `dotnet` a `*.sln`, `*.slnx`, `*.csproj` or
+`*.fsproj`. It looks at most three levels down and never inside `node_modules`, `.git`, `dist`, `bin` or `obj`.
+When it finds one, it asks, and a yes appends the folder to the file. A folder with a line break in its name
+can't be a line of that file, so `dev` says so and leaves it untrusted. It does the same in the home folder and
+in `/`, where a yes would cover every project on the machine.
+[Trusted project folders](configuration.md#trusted-project-folders) shows the question as you see it.
+
+The session always gets explicit values. `SAMEBENCH_TRUSTED` is `1` or `0`, and `SAMEBENCH_TRUSTED_DIR` is the
+line of the file that matched, or the folder you just said yes to, and empty otherwise. A tmux server keeps the
+environment it was started with, and `dev` can be called from inside a trusted session, so an unset variable
+would not be a safe way to say no. The folder is there because every shell of a session inherits its
+environment. Without it, a Neovim started somewhere else from the terminal pane of a trusted session would be
+trusted too. With `TRUST="all"`, `dev` skips the question and leaves the folder empty, which stands for every
+folder, and `env.sh` exports the same two values, which also covers a Neovim started without `dev`.
 
 ## The kernel trick behind `dev -j`
 
@@ -122,12 +196,22 @@ open or diff one of its notebooks. `libexec/nb-convert` calls the jupytext libra
 configuration, and it runs with the Python of the Jupyter tool in isolated mode (`-I`). The result is the same text
 the command produces, and writing back keeps the outputs of the existing notebook.
 
-## The seven day rule for plugins
+## The seven day rule
 
-mise and uv know when a release was published and enforce the minimum age themselves. Plugins come straight from
-git, so `samebench update` does that part in three steps. `Lazy! check` fetches every plugin, `libexec/lock-plugins.lua`
-rewrites `lazy-lock.json`, and `Lazy! restore` checks out exactly what the lockfile now says. The three steps run
-twice, so that plugins a new LazyVim version brought along are covered too.
+mise and uv know when a release was published and enforce the minimum age themselves. npm gets the date from
+`samebench update`, which passes the time of seven days ago as `--before`, so that npm only sees versions the
+registry published before that moment, for the language servers and for everything they depend on.
+
+The .NET tools have no lockfile that a program could move within a range, so update day only reports on them and
+you keep to the rule by hand. `libexec/dotnet-tool-news.lua` asks `dotnet package search` for the versions, which
+uses the feeds and the credentials of your NuGet configuration, and reads the publish dates from the
+registration resource of the same feeds where a feed answers that without a login. It prints the pinned and the
+newest version per feed and changes nothing.
+
+Plugins come straight from git, so `samebench update` does that part in three steps. `Lazy! check` fetches every
+plugin, `libexec/lock-plugins.lua` rewrites `lazy-lock.json`, and `Lazy! restore` checks out exactly what the
+lockfile now says. The three steps run twice, so that plugins a new LazyVim version brought along are covered
+too.
 
 lazy.nvim writes the lockfile once more after that checkout, which is how plugins that LazyVim added or dropped get
 in and out of the list. A checkout that fails must not take a chosen commit along on that way. So after every
@@ -146,15 +230,21 @@ which stops `samebench update` before the lockfile is written.
 ## The daily check
 
 `samebench daily` runs at most once a day from `dev`. It calls `libexec/samebench-check.lua` with `nvim -l`, which reads the
-versions from `mise.lock`, the installed Jupyter packages and the PyPI packages of the project's `uv.lock`, sends
-them to OSV.dev in a single batch request, and fetches the details of every finding in parallel. Severity comes
-from the GitHub advisory database. The result is written to `~/.cache/samebench/check.txt`, one finding per line. When
-any answer is missing or broken, the script exits with status 2 and leaves the previous result alone.
+versions from `mise.lock`, the installed Jupyter packages, the installed web language servers and the PyPI
+packages of the project's `uv.lock`, sends them to OSV.dev in a single batch request, and fetches the details of
+every finding in parallel. Severity comes from the GitHub advisory database, and for Node from the Bitnami
+entries that the check uses because OSV has no package for Node itself. The two .NET tools are not part of the
+check. The result is written to `~/.cache/samebench/check.txt`, one finding per line. When any answer is missing
+or broken, the script exits with status 2 and leaves the previous result alone.
 
 `samebench fix` lifts a tool with `mise lock <tool>@<version>` and a Jupyter package with
 `uv lock --upgrade-package <name>==<version> --exclude-newer-package <name>=false`. Both keep checksums and hashes
-mandatory. The version usually comes from the advisory, so it only passes when it consists of letters, digits and
-the characters `.`, `+`, `_` and `-`.
+mandatory. mise writes a tool of its core backend into `mise.lock` without quotes and without the backend, so
+`"core:node"` in `tools.toml` is `[[tools.node]]` there, and the scripts read both spellings. A version outside the
+major version pinned in `tools.toml` is refused, because a new major version is a change to `tools.toml` that you
+make yourself. The web language servers have no targeted fix and move on update day. The version usually comes
+from the advisory, so it only passes when it consists of letters, digits and the characters `.`, `+`, `_` and
+`-`.
 
 ## Syncing safely
 

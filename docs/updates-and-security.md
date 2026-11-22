@@ -7,7 +7,7 @@ versions on its own. New versions enter the repository in one commit on one mach
 installs exactly that, after it has asked you.
 
 <p align="center">
-  <img alt="Six pinned lists, each wired to the question that comes before its install: samebench apply asks once for mise, the tools and the plugins, and dev -j asks for the Jupyter tool, the project's packages and Python" src="assets/supply-chain.svg" width="100%">
+  <img alt="Ten sources, each wired to the question that comes before it, in the order the questions come. samebench apply first asks before apt installs the .NET SDK from your system, then shows its plan and asks once for mise, the tools, the plugins, the web language servers and the .NET tools. dev -j first asks whether you trust the folder before the editor may load the project's own code, then asks for the Jupyter tool, the project's packages and Python. The .NET SDK and the project's code are drawn dashed because they are not pinned lists" src="assets/supply-chain.svg" width="100%">
 </p>
 
 ## What is pinned where
@@ -22,9 +22,22 @@ installs exactly that, after it has asked you.
 | Jupyter tool | jupyterlab, jupyter-console, jupytext, ipykernel | `envs/jupyter/uv.lock`, hashes |
 | Project packages | whatever the project you open asks for | the project's own `uv.lock`, installed exactly as locked |
 | Python | CPython builds | checksums inside uv |
+| Node.js, with the `web` module | the release from nodejs.org | `config/mise-global/mise.lock`, checksums per platform, which mise takes from the signed checksum file of the release |
+| Web language servers, with the `web` module | vtsls, the Angular language server, TypeScript and the servers for HTML, CSS, JSON and ESLint | `envs/web/package-lock.json`, integrity hashes |
+| npm packages of a frontend project | whatever its `package.json` asks for | the project's own lockfile. You install them yourself with `npm ci`, this setup never does |
+| .NET SDK, with the `dotnet` module | the SDK versions named in `DOTNET_SDK` | your system. On Ubuntu that is the signed archive of the distribution, on a Mac the signed installer from Microsoft |
+| .NET tools, with the `dotnet` module | EasyDotnet, the server behind easy-dotnet.nvim, and `roslyn-language-server` | `envs/dotnet/tools.txt`, exact versions. NuGet checks package signatures where it can, see below |
+| NuGet packages of a .NET project | whatever its project files ask for | the project itself. You restore them yourself with `dotnet restore`, this setup never does |
 
 mise is the one program `samebench` downloads itself. It compares the download with the SHA-256 for your platform and
 stops without installing anything when the two differ.
+
+The two .NET tools are the one list without a checksum of its own. `envs/dotnet/tools.txt` pins exact versions,
+and `dotnet tool` fetches them from the feed in your NuGet configuration. Packages on nuget.org carry a signature
+of the repository, and the language server also one of Microsoft. NuGet verifies these signatures by default on
+Linux. On macOS it skips the check by default, so `samebench` turns it on for this one install. The check only
+covers feeds that declare their packages as signed, which nuget.org does and a company feed may not. Take it
+as a safeguard for the public feed and not as a guarantee for every source.
 
 When a lockfile is missing or empty, `samebench apply` stops as well, because installing without it would mean
 taking whatever version is newest. Only the machine with `UPDATER="yes"` goes on and creates a new one.
@@ -36,7 +49,7 @@ plugin is not at its locked commit.
 
 Some things are switched off on purpose.
 
-- **Mason** stays off, so tools only come from mise.
+- **Mason** stays off, so tools and language servers only come from the lists above.
 - **The prebuilt completion binary** of blink.cmp is replaced by its pure Lua version.
 - **lazy.nvim** doesn't look for updates in the background, doesn't use luarocks and ignores a `.lazy.lua` in
   project folders.
@@ -49,6 +62,20 @@ Some things are switched off on purpose.
   clipboard of the machine you sit at. Pasting from `"+` over SSH asks your terminal for its clipboard, which
   some terminals confirm or refuse, and the terminal's own paste key is unaffected.
 - **uv** never downloads Python silently.
+- **npm** installs the web language servers without running any install script and takes no package from a git
+  repository. It sends no audit request and doesn't look for a newer npm while it does that.
+- **Automatic type acquisition** of the TypeScript server is off. It would install type packages from the npm
+  registry in the background.
+- **The self-install of easy-dotnet.nvim and its server** never runs. The plugin would install the newest
+  EasyDotnet with `dotnet tool install -g` when it is missing, and EasyDotnet would install the newest
+  `roslyn-language-server` the same way. Both tools are pinned and installed by `samebench apply` instead, and
+  the plugin does not load while one of them is missing.
+- **The update check of the EasyDotnet server** is skipped. It would ask api.nuget.org about newer versions on
+  every start, whatever feed you configured. The server has no option for that, so Neovim writes the file in
+  which the server keeps the time of its last check, with a time far in the future. This works with the pinned
+  version and is a best effort, since a later version may keep that time somewhere else. On Linux that file
+  lives in `/tmp`, which all users of a machine share, so Neovim only writes it into a folder that belongs to
+  you and that nobody else can write to. Otherwise it leaves the check alone.
 - **JupyterLab** only listens on `127.0.0.1`, needs a token, has no terminal in the browser, and the kernel talks
   over local sockets. Its extension manager can't install anything, and it doesn't fetch news or look for updates.
 - **Format on save** is off, so you never reformat someone else's code by accident.
@@ -59,18 +86,23 @@ Nothing from the table above arrives on its own. Each install waits for a yes.
 
 | Before this is installed | The question comes from |
 |---|---|
-| mise, the tools and the plugins | `samebench apply`, after it has shown the whole plan |
+| mise, the tools, the plugins, the web language servers and the .NET tools | `samebench apply`, after it has shown the whole plan |
 | Missing system packages on Linux | `samebench apply`, with the exact `apt-get` command |
+| A .NET SDK on Linux, when your package sources offer it | `samebench apply`, with the exact `apt-get` command. On a Mac `samebench` only names Microsoft's installer |
 | The Jupyter tool | the first `dev -j`, or `samebench jupyter` |
 | A project's packages | `dev -j`, once for each version of the project's `uv.lock` |
 | A Python version | `dev -j`, `samebench jupyter` or `samebench update`, before uv downloads it |
 | A fix for a security advisory | `dev` or `samebench check` |
 | New commits for this repository | `samebench sync` |
 
+One more question is not about an install. With the `web` or the `dotnet` module, `dev` asks once per project
+folder before the language servers and formatters in Neovim may load code from that folder. The next section says
+what a yes allows.
+
 ## Opening someone else's repository
 
 A cloned repository should not be able to run anything just because you look at it. These rules hold until you
-run its code yourself, for example a notebook cell.
+run its code yourself, for example a notebook cell, or tell `dev` that you trust the folder.
 
 - A `.venv` that the repository ships, meaning git tracks files in it, is never activated and never becomes a kernel.
 - A kernel starts without the notebook's folder on its import path, so a file in the repository can't take the
@@ -83,6 +115,43 @@ run its code yourself, for example a notebook cell.
   come from PyPI, with the index, git repository, URL or path it comes from. Building a package can run code from
   it, so say yes only in repositories you trust that far. A lockfile that changes asks again, and plain `dev`
   never installs packages.
+- With the `web` module, every language server starts from samebench's own folder and never from the project's
+  `node_modules`. Until you trust a folder, the servers run in a restricted mode in which only code from that
+  folder runs. The project's own TypeScript, its Angular language service and the plugins its `tsconfig.json`
+  names are not loaded, and ESLint and prettier stay off, because both load JavaScript from the project. The
+  JSON server downloads no schema that a file names by URL.
+  [The web module](configuration.md#the-web-module) says what that means while you work.
+- With the `dotnet` module, the C# language server has no restricted mode. To understand a project it evaluates
+  the MSBuild files and runs design-time builds, and those run build targets from the folder, for example from a
+  `Directory.Build.targets`. So until you trust a folder, the plugin does not load at all. No .NET process starts,
+  and C# files get syntax highlighting only.
+- `dev` asks once per project folder whether you trust it, when it builds a session there. A yes is a real
+  decision. From then on code from the repository runs with your permissions as soon as you open a file. In a
+  frontend that is the project's TypeScript, its Angular language service, the plugins its `tsconfig.json` names,
+  and ESLint and prettier with their configuration. In a .NET solution it is the build targets, within seconds of
+  opening a C# file, and the test assemblies, which the discovery of the tests loads. Say yes for your own
+  projects and for repositories in which you would also run `npm ci` or `dotnet build`. A no changes nothing, and
+  the session opens all the same. A yes covers the folder and every folder below it, which is why `dev` never
+  asks in your home folder. The trust stays with that folder. A Neovim that you start in another folder, also
+  from a shell of the trusted session, works without it. A file from another folder that you open inside a
+  trusted Neovim is treated like the trusted ones, so give a repository you don't know its own `dev`.
+  [Trusted project folders](configuration.md#trusted-project-folders) shows the question, where the answers are
+  kept and how to take one back.
+- A `mise.toml` or `.nvmrc` in a project can't bring in another Node version. mise ignores `.nvmrc`. It refuses a
+  `mise.toml` from a project folder with an error until you approve that file with `mise trust`, and it only
+  installs what the lockfile of this repository names. A project file that asks for another Node version gets
+  none, also after `mise trust`, so `node` is then missing in that folder instead of replaced.
+
+Commands you type are a different matter. `npm ci`, `npm install`, `ng serve`, `dotnet build` and `dotnet run`
+run the project's code and the install scripts or build targets of its packages, like any other program you
+start in a terminal.
+
+Two things the .NET tools send on their own are worth knowing, because `samebench` leaves both alone. The C#
+language server sends usage data to Microsoft, and in tests with the pinned version neither the opt-out variable
+of the .NET CLI nor the server's own telemetry switch stopped that. Blocking it would mean changing the proxy
+settings of the server, which this setup does not do. The `dotnet` command sends usage data as well unless you
+set `DOTNET_CLI_TELEMETRY_OPTOUT=1` yourself, for example in your shell profile. `samebench` does not set it for
+you, because that choice may be yours or your company's to make.
 
 ## Update day, once a month
 
@@ -92,9 +161,9 @@ Update day happens on one machine, the one with `UPDATER="yes"`.
 samebench update
 ```
 
-This brings in new versions of the tools, the Neovim plugins and the Jupyter packages, and it only takes versions
-that are at least seven days old. Most hijacked releases are discovered within a few days, and the delay keeps
-you out of that window.
+This brings in new versions of the tools, the Neovim plugins, the Jupyter packages and the web language servers,
+and it only takes versions that are at least seven days old. Most hijacked releases are discovered within a few
+days, and the delay keeps you out of that window.
 
 | Step | What happens |
 |---|---|
@@ -102,6 +171,8 @@ you out of that window.
 | Plugins | Each plugin is locked to the newest commit on its branch that is at least seven days old, then lazy.nvim checks out exactly the lockfile |
 | Jupyter tool | `uv lock --upgrade` with the seven day rule |
 | Python | `uv python upgrade` for the versions uv installed, which brings security patches within a version |
+| Web language servers | `npm update` writes only the lockfile and takes versions published at least seven days ago. This step runs on a machine with the `web` module |
+| .NET tools | Nothing changes. The step shows, for each tool in `envs/dotnet/tools.txt`, the pinned version and the newest one on your feed with its publish date. This step runs on a machine with the `dotnet` module |
 
 Plugins have no registry that records a release date, so for them the rule works on commits. lazy.nvim, LazyVim
 and blink.cmp follow release tags, and they move to a new release only once its commit is seven days old. A
@@ -116,7 +187,19 @@ stops the update and leaves `lazy-lock.json` alone.
 
 Look at the diff, try it for a minute with `dev`, then commit and push. In Neovim, `:Lazy` → *Log* shows the new
 commits per plugin. Every other machine follows with `samebench sync`. Major versions such as Neovim 0.12 to 0.13 are
-pinned in `modules/*/tools.toml` and only change when you decide so.
+pinned in `modules/*/tools.toml` and only change when you decide so. The same holds for Node, which stays on one
+major version, and for the language servers, which move within the ranges in `envs/web/package.json`.
+
+Node publishes security releases several times a year. Within the pinned major version they arrive by
+themselves, on update day once the release is seven days old, or earlier through the daily check described
+below, which offers the fixed version as soon as an advisory for your version is rated high or critical.
+
+The .NET tools are raised by hand. Their step on update day shows what is new, and you put the version you want
+into `envs/dotnet/tools.txt`. No program enforces the seven day rule here, so pick a version that is old enough
+yourself, which is what the publish date in the overview is for. EasyDotnet is the server of easy-dotnet.nvim,
+and the two only work together within one major version. The plugin moves with the other plugins on update day,
+so when a new major version arrives, raise EasyDotnet in the same commit. `samebench doctor` warns when the two
+differ. After changing the file, `samebench apply` installs the new versions.
 
 To update **mise itself**, change its version and the checksums at the top of `bin/samebench`. The checksums come
 from the `SHA256SUMS` file of the release, and a version that is at least seven days old is the right choice here
@@ -135,6 +218,16 @@ packages from other indexes stay on your machine. For the project you only get a
 never changed. If OSV.dev answers only in part, the check counts as not done and runs again next time.
 Neovim, tmux and Python itself have no matching package in OSV, and the monthly update day covers them.
 
+With the `web` module the check also covers Node and every installed package of the web language servers. OSV
+has no package for Node itself, so the check uses the entries of the Bitnami vulnerability database, which list
+the advisories of the Node project by Node version. For the language servers you only get a note. They have no
+targeted fix, and the next update day brings their new versions. The npm packages of a project you open are not
+checked. Run `npm audit` in the project for that.
+
+The two .NET tools of the `dotnet` module are not part of the check. OSV would only see their two package names
+and not what they bundle, so the update day covers them. The NuGet packages of a project you open are not checked
+either. `dotnet restore` reports known vulnerabilities in them by itself.
+
 When a vulnerability is rated **high or critical**, `dev` asks you before the workspace opens.
 
 ```text
@@ -143,8 +236,10 @@ When a vulnerability is rated **high or critical**, `dev` asks you before the wo
 ```
 
 Saying yes lifts only that package, and only to the version the advisory names as fixed, not to the newest one.
-Checksums and hashes stay mandatory. Less severe findings appear as a single line, and `samebench check` shows the
-details. To turn the check off on a machine, set `CHECK="off"`.
+Checksums and hashes stay mandatory. A fixed version outside the major version pinned in `modules/*/tools.toml`
+is not offered. `dev` names it and says that the pin has to change, because changing a major version stays your
+decision. Less severe findings appear as a single line,
+and `samebench check` shows the details. To turn the check off on a machine, set `CHECK="off"`.
 
 > [!NOTE]
 > The exception from the seven day rule needs an entry in an independent advisory database. A release note that

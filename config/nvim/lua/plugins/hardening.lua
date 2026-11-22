@@ -1,6 +1,8 @@
 -- Security hardening of LazyVim: nothing silently downloads programs from the network.
--- Programs (language servers, tree-sitter, …) come only from mise
--- (pinned, with checksums), plugins from lazy-lock.json (exact commits).
+-- Programs only come from the pinned lists of this repository, installed by `samebench apply`:
+-- tools from mise (mise.lock, checksums), the language servers of the web module from
+-- envs/web (package-lock.json, integrity hashes) and the .NET tools of the dotnet module
+-- from envs/dotnet/tools.txt (exact versions). Plugins come from lazy-lock.json (exact commits).
 
 return {
   -- Mason off: it would download language servers from many sources (some via npm)
@@ -18,7 +20,7 @@ return {
     },
   },
 
-  -- Only language servers installed via mise (lua_ls is not one of them)
+  -- Only language servers that samebench installs (lua_ls is not one of them)
   {
     "neovim/nvim-lspconfig",
     opts = { servers = { lua_ls = { enabled = false } } },
