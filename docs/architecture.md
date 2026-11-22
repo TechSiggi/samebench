@@ -29,10 +29,11 @@ then through the few places where the scripts do something that is not obvious f
 ## The pieces
 
 ```text
-bin/samebench                plan · apply · update · sync · check · fix · doctor · jupyter · remove
+bin/samebench                plan · apply · update · sync · check · fix · doctor · jupyter · remove · mise
 bin/dev                      starts the tmux layouts, -j adds Jupyter
 bin/jlab                     prints a clickable link to JupyterLab and opens the browser where it can
 libexec/common.sh            output and question helpers shared by samebench and dev
+libexec/mise                 the only way mise is called, with folders of its own and no project configuration
 libexec/jupyter-attach       connects the console to a notebook's kernel, standard library only
 libexec/nb-convert           turns a notebook into Python cells and back, for Neovim and git
 libexec/ipynb-textconv       notebook diffs for git, falls back to the plain file without Jupyter
@@ -62,9 +63,9 @@ few short shell, Python and Lua files. There is no framework and no build step.
 flowchart TD
     A["load the profile and local.sh"] --> B["check the system<br/>Apple tools or apt packages,<br/>the .NET SDK with the dotnet module"]
     B --> C["show the plan and wait for yes"]
-    C --> D["install mise<br/>pinned version, SHA-256 compared"]
-    D --> E["link the configuration<br/>~/.config/samebench-nvim, mise"]
-    E --> F["write ~/.config/samebench/env.sh<br/>one line in .zshrc and .bashrc"]
+    C --> D["install mise into ~/.local/share/samebench<br/>pinned version, SHA-256 compared,<br/>an earlier setup is moved there first"]
+    D --> E["link the configuration<br/>~/.config/samebench-nvim, ~/.config/samebench/mise"]
+    E --> F["write ~/.config/samebench/env.sh<br/>one line in the shell startup files"]
     F --> G["mise install --locked"]
     G --> H["git settings for notebooks"]
     H --> I["Lazy! restore<br/>checkouts compared with lazy-lock.json"]
@@ -76,12 +77,24 @@ flowchart TD
 Nothing before the question changes the machine, apart from apt packages that `samebench` found missing and asked about
 separately. `samebench apply -y` skips the question, which is how `samebench sync` calls it after asking its own.
 
-The mise step does nothing when exactly the pinned version already sits in `~/.local/bin`. Otherwise it downloads
-the release archive over HTTPS into a temporary folder, compares its SHA-256 with the sum for this platform from
-the top of `bin/samebench`, and only then copies the binary into place. A mismatch ends `samebench` with nothing installed. A
-mise that was there before `samebench` ever set up this machine is moved to `mise.backup-<date>` first, and `samebench remove`
-puts it back when you let it delete the installed programs as well. In that case the data and cache folders of mise
-stay, since the earlier mise keeps its tools in the same place.
+The mise step does nothing when exactly the pinned version already sits in `~/.local/share/samebench/bin`.
+Otherwise it downloads the release archive over HTTPS into a temporary folder, compares its SHA-256 with the sum
+for this platform from the top of `bin/samebench`, and only then copies the binary into place. A mismatch ends
+`samebench` with nothing installed.
+
+Every call of mise goes through `libexec/mise`, from `bin/samebench`, from `bin/dev` and from `env.sh`, and from a
+shell as `samebench mise`. It points the configuration, data, state and cache of mise at folders of samebench,
+`~/.config/samebench/mise`, `~/.local/share/samebench/mise`, `~/.local/state/samebench/mise` and
+`~/.cache/samebench/mise`, and clears what an activated mise of your own left in the environment. mise looks for
+configuration files in the current folder and every folder above it. `libexec/mise` turns that search off and runs
+mise from the home folder, so it reads no `mise.toml`, `.nvmrc` or `.tool-versions` from a project or from your
+home folder. A mise of your own and its folders are never touched. Variables such as `MISE_GITHUB_TOKEN` still
+reach it.
+
+Before that step, `samebench apply` moves the setup of an earlier version, which kept mise in `~/.local/bin` and
+shared `~/.config/mise` and `~/.local/share/mise`, into these folders. It finds that setup by its links in
+`~/.config/mise`, and [machines with an existing setup](installation.md#machines-with-an-existing-setup)
+describes what it does with it.
 
 On a new machine the Neovim configuration fetches lazy.nvim and LazyVim itself first, each at its locked commit,
 before lazy.nvim starts. LazyVim names most of the plugins. Without it lazy.nvim would install in two rounds, forget
@@ -130,27 +143,29 @@ only when the folder is trusted and both tools are in place. That second conditi
 that loads without its server would install one. For the same reason the module writes the small file in which
 the plugin notes that its server is installed, before the plugin loads, so the plugin never runs its own check.
 
-`env.sh` has two parts. The first part always runs and only makes `samebench`, `dev`, `jlab` and mise reachable on the
-`PATH`. The second part activates mise, sets the editor and handles the project's `.venv`. With `ACTIVATE="dev"`
-that second part only runs inside `dev` sessions, which is how other shells stay untouched.
+`env.sh` has two parts. The first part always runs and only makes `samebench`, `dev` and `jlab` reachable on the
+`PATH`. The second part puts the tools from mise first in the `PATH`, sets the editor and handles the project's
+`.venv`. It asks `libexec/mise env` once when the shell starts and hooks nothing into the prompt. With
+`ACTIVATE="dev"` that second part only runs inside `dev` sessions, which is how other shells stay untouched.
 
 ## Where things live on a machine
 
 | Path | Content |
 |---|---|
-| `~/.config/samebench/` | profile name, `env.sh`, generated git and tmux snippets, `local.sh`, `allowed_signers`, `trusted` with the project folders you trusted |
+| `~/.config/samebench/` | profile name, `env.sh`, generated git and tmux snippets, `local.sh`, `allowed_signers`, `trusted` with the project folders you trusted, `created` with the files and folders samebench created, on Linux `apt-installed` with the Ubuntu packages installed after your yes |
+| `~/.config/samebench/mise/` | links to the mise settings, `mise.lock` and the `tools.toml` of each active module |
 | `~/.config/samebench-nvim` | link to `config/nvim` in this repository |
-| `~/.local/bin/mise` | the pinned mise |
+| `~/.local/share/samebench/bin/mise` | the pinned mise |
+| `~/.local/share/samebench/mise/` | the tools from mise, the Node.js of the `web` module included |
 | `~/.local/share/samebench-nvim/` | Neovim plugins and parsers |
 | `~/.local/share/samebench/` | the Jupyter tool, kernel definitions per project, kernel overlays, approved project lockfiles, the web language servers, the .NET tools |
-| `~/.local/share/mise/` | the tools from mise |
-| `~/.local/state/mise/`, `~/.cache/mise/`, on macOS also `~/Library/Caches/mise/` | state and cached downloads of mise |
+| `~/.local/state/samebench/mise/`, `~/.cache/samebench/mise/` | state and cached downloads of mise |
 | `~/.cache/samebench/` | the result of the daily check |
 | `~/.dotnet/`, `~/.nuget/`, on macOS also folders below `~/Library/Application Support/` | with the `dotnet` module, what .NET and its language servers keep for themselves, such as the NuGet package cache, logs and caches. They are not part of this setup and stay when it is removed |
 
 The settings folder is always `~/.config/samebench`, also when `XDG_CONFIG_HOME` points somewhere else, because
-the line in `.zshrc` and `.bashrc` and the tmux configuration name that path. The links for mise and Neovim follow
-`XDG_CONFIG_HOME`, as those programs do.
+the line in the shell startup files and the tmux configuration name that path. The links for mise live there as
+well. The link for Neovim follows `XDG_CONFIG_HOME`, as Neovim does.
 
 Neovim runs with `NVIM_APPNAME=samebench-nvim`, which gives it its own configuration, data and cache folders. tmux runs as
 `tmux -L samebench -f config/tmux/tmux.conf`, a separate server that never reads `~/.tmux.conf`.

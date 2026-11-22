@@ -2,10 +2,13 @@
 -- only needs curl, no further dependencies.
 --
 --   nvim -l samebench-check.lua <repo> <jupyter-venv> <output> [project folder] [web folder]
+--                               [own Node.js: yes | no] [version of another Node.js]
 --
 -- Asks OSV.dev (an open vulnerability database that includes the GitHub
 -- security advisories and PyPI) about the INSTALLED versions of
---   * the tools in mise.lock (where OSV has a matching package)
+--   * the tools in mise.lock (where OSV has a matching package). Node.js only counts where
+--     samebench installed it (the web module with NODE="samebench")
+--   * a Node.js on the machine that samebench did not install (a note only, never changed)
 --   * the Jupyter tool (the packages installed in its environment)
 --   * the web language servers (the npm packages installed in their folder, a note only)
 --   * optionally a project's uv.lock (a note only, never changed)
@@ -15,10 +18,11 @@
 --
 -- Output: one line per finding, fields separated by "|":
 --   severity|kind|ecosystem|package|version|id|fixed-in|summary|tool
--- kind = tool | jupyter | web | project; tool = mise name (only for kind=tool)
+-- kind = tool | jupyter | web | project | system; tool = mise name (only for kind=tool)
 -- Exit 0 = checked (file written), 2 = no complete answer from OSV.dev.
 
 local repo, venv, out_file, project, web = arg[1], arg[2], arg[3], arg[4], arg[5]
+local own_node, other_node = arg[6] ~= "no", arg[7]
 local API = "https://api.osv.dev/v1"
 
 -- mise tool to OSV package (Neovim and tmux have no matching package there).
@@ -105,11 +109,19 @@ for line in lock:gmatch("[^\n]+") do
   elseif current and line:match("^version = ") then
     local v = line:match('"([^"]+)"')
     local m = TOOL_MAP[current]
+    if current == "node" and not own_node then
+      m = nil
+    end
     if m and v then
       table.insert(items, { "tool", m[1], m[2], v, current })
     end
     current = nil
   end
+end
+
+-- A Node.js that samebench did not install: the same advisories, by its own version
+if other_node and other_node:match("^%d+%.%d+%.%d+") then
+  table.insert(items, { "system", TOOL_MAP["node"][1], TOOL_MAP["node"][2], other_node, "" })
 end
 
 -- Jupyter tool: the packages actually installed

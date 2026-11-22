@@ -1,6 +1,7 @@
-# Global mise configuration, linked to ~/.config/mise/config.toml
+# Configuration of the mise that samebench installs for itself, linked to
+# ~/.config/samebench/mise/config.toml. A mise of your own keeps its ~/.config/mise.
 # The tools themselves are listed in modules/<module>/tools.toml and are linked by
-# `samebench apply` into ~/.config/mise/conf.d/ (active modules only).
+# `samebench apply` into ~/.config/samebench/mise/conf.d/ (active modules only).
 
 [settings]
 # Maintain a lockfile with exact versions, download URLs and checksums …
@@ -13,9 +14,9 @@ locked = true
 # Freshly hijacked releases are usually discovered within a few days.
 minimum_release_age = "7d"
 
-# Paranoid mode: project configurations (e.g. .nvmrc, mise.toml in other people's
-# repos) need explicit approval, provenance (signatures,
-# attestations) is verified again on every install.
+# Paranoid mode: provenance (signatures, attestations) is verified again on every install,
+# and a configuration file needs explicit approval. This mise never gets that far with a
+# project: libexec/mise keeps it from reading any mise.toml, .nvmrc or .tool-versions.
 paranoid = true
 
 # No plugin backends that run third-party shell scripts.

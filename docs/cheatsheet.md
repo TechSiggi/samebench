@@ -142,6 +142,8 @@ go to definition, rename and quick fixes use the same keys as everywhere else.
 | `dev -s` | List sessions | | `samebench sync` | Take the repository's state |
 | `dev -k` | Stop this session | | `samebench check` | Look for vulnerabilities |
 | `dev -r` | Rebuild the session | | `samebench doctor` | Check this machine |
+| `jlab` | Open JupyterLab | | `samebench mise ls` | Tools of the mise of samebench |
+| | | | `samebench remove` | Undo the setup, `--all` also its programs and data |
 
 <details>
 <summary><b>Vim basics</b></summary>

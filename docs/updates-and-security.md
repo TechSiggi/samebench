@@ -43,7 +43,7 @@ installs exactly that, after it has asked you.
 | Jupyter tool | jupyterlab, jupyter-console, jupytext, ipykernel | `envs/jupyter/uv.lock`, hashes |
 | Project packages | whatever the project you open asks for | the project's own `uv.lock`, installed exactly as locked |
 | Python | CPython builds | checksums inside uv |
-| Node.js, with the `web` module | the release from nodejs.org | `config/mise-global/mise.lock`, checksums per platform, which mise takes from the signed checksum file of the release |
+| Node.js, with the `web` module | the release from nodejs.org | `config/mise-global/mise.lock`, checksums per platform, which mise takes from the signed checksum file of the release. With `NODE="system"` none is installed, and the Node.js of your system is yours to keep up to date |
 | Web language servers, with the `web` module | vtsls, the Angular language server, TypeScript and the servers for HTML, CSS, JSON and ESLint | `envs/web/package-lock.json`, integrity hashes |
 | npm packages of a frontend project | whatever its `package.json` asks for | the project's own lockfile. You install them yourself with `npm ci`, this setup never does |
 | .NET SDK, with the `dotnet` module | the SDK versions named in `DOTNET_SDK` | your system. On Ubuntu that is the signed archive of the distribution, on a Mac the signed installer from Microsoft |
@@ -73,6 +73,7 @@ Some things are switched off on purpose.
   project folders.
 - **mise** runs in paranoid mode, without asdf or vfox plugins and without installing anything on its own. It
   doesn't look for newer versions of itself either, so it only changes through the version pinned in `bin/samebench`.
+  It has folders of its own, so a mise you already have is never read and never changed.
 - **tmux plugins and `curl | sh` installers** are not used anywhere.
 - **Setting the clipboard from a tmux pane** is blocked, for programs and for text that is merely printed there.
   A hostile file shown with `cat`, or output from a remote machine, can't fill your clipboard. Copy mode and
@@ -148,10 +149,10 @@ run its code yourself, for example a notebook cell, or tell `dev` that you trust
   the session opens all the same.
   [Trusted project folders](configuration.md#trusted-project-folders) shows the question, how far a yes reaches,
   where the answers are kept and how to take one back.
-- A `mise.toml` or `.nvmrc` in a project can't bring in another Node version. mise ignores `.nvmrc`. It refuses a
-  `mise.toml` from a project folder with an error until you approve that file with `mise trust`, and it only
-  installs what the lockfile of this repository names. A project file that asks for another Node version gets
-  none, also after `mise trust`, so `node` is then missing in that folder instead of replaced.
+- A `mise.toml`, `.nvmrc` or `.tool-versions` in a project can't bring in another Node version or any other tool.
+  The mise of samebench never reads such a file, neither from a project folder nor from your home folder. It only
+  reads the configuration that `samebench apply` links for it in `~/.config/samebench/mise`, and it only installs
+  what the lockfile of this repository names.
 
 Commands you type are a different matter. `npm ci`, `npm install`, `ng serve`, `dotnet build` and `dotnet run`
 run the project's code and the install scripts or build targets of its packages, like any other program you
@@ -198,7 +199,9 @@ major version, and for the language servers, which move within the ranges in `en
 
 Node publishes security releases several times a year. Within the pinned major version they arrive by
 themselves, on update day once the release is seven days old, or earlier through the daily check described
-below, which offers the fixed version as soon as an advisory for your version is rated high or critical.
+below, which offers the fixed version as soon as an advisory for your version is rated high or critical. That
+holds for the Node.js of samebench. With `NODE="system"` update day leaves Node.js alone, and you update it the
+way you installed it.
 
 The .NET tools are raised by hand. Their step on update day shows what is new, and you put the version you want
 into `envs/dotnet/tools.txt`. No program enforces the seven day rule here, so pick a version that is old enough
@@ -226,7 +229,10 @@ Neovim, tmux and Python itself have no matching package in OSV, and the monthly 
 
 With the `web` module the check also covers Node and every installed package of the web language servers. OSV
 has no package for Node itself, so the check uses the entries of the Bitnami vulnerability database, which list
-the advisories of the Node project by Node version. For the language servers you only get a note. They have no
+the advisories of the Node project by Node version. The Node.js from `mise.lock` only counts where samebench
+installed it. A Node.js on your `PATH` that samebench did not install, the first one it finds, is checked as well
+and reported as `system`. With `NODE="system"` that is the one the language servers run on. For it you only get
+a note, because samebench never changes it. For the language servers you only get a note as well. They have no
 targeted fix, and the next update day brings their new versions. The npm packages of a project you open are not
 checked. Run `npm audit` in the project for that.
 

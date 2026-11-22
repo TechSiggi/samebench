@@ -120,7 +120,7 @@ only ever sent to a running Python or Jupyter console and never into a plain she
 | Python | uv, only after you confirm | `~/.local/share/uv/python` |
 | Project packages such as pandas | `uv sync` in the project | the project's `.venv` |
 | The Jupyter tool | `envs/jupyter/uv.lock`, on the first `dev -j` | `~/.local/share/samebench/jupyter-venv` |
-| uv, ruff and ty | mise with checksums and GitHub attestations | `~/.local/share/mise` |
+| uv, ruff and ty | mise with checksums and GitHub attestations | `~/.local/share/samebench/mise` |
 
 No Python package is installed globally. Be careful with `uv pip install jupyter` inside a project. It installs
 without an entry in `pyproject.toml` or `uv.lock`, so there are no hashes, and the next `uv sync` removes it again.

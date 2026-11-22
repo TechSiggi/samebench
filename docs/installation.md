@@ -44,7 +44,9 @@ samebench plan                         # on a machine that is set up
 After your yes, `samebench apply` downloads the one program it fetches itself, the version manager mise. The
 version and the SHA-256 sums for the supported platforms sit at the top of [`bin/samebench`](../bin/samebench).
 When the download does not match, `samebench` stops and installs nothing. Everything else comes through mise and
-the lockfiles. On Linux, `samebench apply` also warns when `unattended-upgrades` is missing.
+the lockfiles. This mise is a copy of its own in `~/.local/share/samebench/bin` with folders of its own, and it is
+not on your `PATH`. When you want to ask it something, type `samebench mise`, for example `samebench mise ls`. On
+Linux, `samebench apply` also warns when `unattended-upgrades` is missing.
 
 ## Linux VM over SSH
 
@@ -199,14 +201,13 @@ belong to someone else without keeping a copy.
 | Your own tmux and `tmux.conf` | Stay as they are. `dev` runs its own tmux server |
 | `~/.config/uv/uv.toml` with your own uv settings | Stays unchanged |
 | uv, Jupyter or Python from Homebrew, pip or apt | Stay installed, and `samebench plan` lists them |
-| Node.js from nvm, Homebrew or apt | Stays installed. With the `web` module, `samebench plan` lists it |
+| Node.js from nvm, Homebrew or apt | Stays installed, and samebench never updates or removes it. With the `web` module, `samebench plan` and `samebench doctor` name it with its version and path, and the daily check reports advisories for it as a note. With `NODE="system"` samebench uses it instead of a Node.js of its own, see [the web module](configuration.md#the-web-module) |
 | `~/.npmrc` with your own npm settings, for example a company registry | Stays unchanged and is used. The language servers of the `web` module come through the registry it names |
 | A .NET SDK that is already installed | Is used as it is. With the `dotnet` module, `samebench` reads `dotnet --list-sdks` and changes nothing |
 | Global .NET tools in `~/.dotnet/tools` | Stay as they are. The `dotnet` module keeps its two tools in a folder of its own |
 | Your NuGet configuration, for example a company feed | Stays unchanged and is used. The .NET tools of the `dotnet` module come through the feeds it names |
-| A mise of another version in `~/.local/bin` | Is kept as `mise.backup-<date>` with a warning, and the pinned version takes its place |
-| `~/.config/mise/config.toml`, as a file or as a link of your own | Is kept as `config.toml.backup-<date>` and replaced by a link into the repository |
-| `.zshrc`, `.bashrc`, global git config | Get one addition each, nothing is replaced |
+| A mise of your own, with `~/.config/mise` and `~/.local/share/mise` | Is never read and never changed. samebench installs its own copy with folders of its own, and `samebench plan` lists yours as untouched |
+| `.zshrc`, `.bashrc`, global git config | Get one addition each, nothing is replaced. Only the startup file of your login shell is created when it is missing, and `samebench remove` deletes a file it created once nothing else is in it |
 
 On a machine where other tools should behave exactly as before, set the activation to `dev`. Then the tools
 from mise only appear inside `dev` sessions, and every other shell, VS Code Remote included, stays the way it was.
@@ -220,6 +221,14 @@ JUPYTER="no"       # never install Jupyter on this machine
 
 Details of a single machine, such as mirror URLs or host names, never belong in the repository. Keep them in
 `local.sh` or in the machine's own configuration files.
+
+An earlier version of samebench kept mise in `~/.local/bin` and shared `~/.config/mise` and `~/.local/share/mise`.
+The next `samebench apply`, also the one at the end of `samebench sync`, finds that setup by its links in
+`~/.config/mise` and shows the move in its plan. After your yes it moves the program, the tools and the state into
+the new folders without downloading anything again, deletes the old download cache and removes the old links.
+Running `dev` sessions lose their tools through the move, so rebuild each one with `dev -r`. If you had a mise of
+your own, either put aside as `mise.backup-<date>` or somewhere else on your `PATH`, that mise and its folders stay
+or come back, and the tools of samebench are installed again into its own folder.
 
 ## Behind a proxy
 
@@ -244,17 +253,32 @@ A few things are worth knowing.
 ## Taking it all away again
 
 ```bash
-samebench remove
+samebench remove           # asks, then asks again about the programs, data and caches
+samebench remove --all     # also deletes the programs, data and caches, local.sh and allowed_signers
 ```
 
-This removes the line in `.zshrc` and `.bashrc`, the additions to your global git config, all links (backups come
-back) and running `dev` sessions. Afterwards it asks separately whether the installed programs, their data and the
-caches should go too. If you say yes and `samebench` had put a mise of yours aside, that one comes back, and the
-folders of mise stay because they hold its tools as well. Your `local.sh` and your `allowed_signers` stay. The
-list of project folders you trusted goes with the rest of `~/.config/samebench`, so a later setup asks again. Python
-versions installed by uv and its package cache live in `~/.local/share/uv` and `~/.cache/uv`. They belong to uv,
-so they stay as well. The same goes for the package cache of npm in `~/.npm`. With the `dotnet` module, the SDK
-stays because it belongs to your system, and so do `~/.dotnet`, the package cache in `~/.nuget` and the folders
-in which the .NET language servers keep their own logs and caches. A few small caches can stay too, from
-tree-sitter, from ty and from the signature check in mise, because other programs may share them.
-`samebench remove` names them when they exist.
+This removes the line in your shell startup files, the additions to your global git config, the link
+`~/.config/samebench-nvim` (a backup comes back), running `dev` sessions and the two files in the temporary folder
+with which the `dotnet` module skips the update check of its server. Files and folders that only exist
+because samebench created them, such as `~/.zshrc` or `~/.bashrc`, `~/.gitconfig` and the global git attributes
+and ignore files, are recorded in `~/.config/samebench/created` and go as well when nothing else is in them. A
+setup made by an earlier version has no such record, so `samebench remove` names the files that are empty
+afterwards instead of deleting them. The list of project folders you trusted goes with the rest of
+`~/.config/samebench`, so a later setup asks again.
+
+Afterwards it asks separately whether the installed programs, their data and the caches should go too. mise and
+all of its folders are among them, and so is the Node.js of samebench. `samebench remove` says so, lists the npm
+packages you installed globally with that Node.js, and leaves another Node.js alone. Your `local.sh` and your
+`allowed_signers` stay. `samebench remove -y` skips the first question and keeps the programs. With `--all` the
+programs, data and caches go as well, and so do `local.sh` and `allowed_signers`, so nothing of samebench is left
+outside the repository. `samebench remove -y --all` does that without any question.
+
+Some things stay in every case, because other programs share them or they belong to your system. Python versions
+installed by uv and its package cache live in `~/.local/share/uv` and `~/.cache/uv`, and links such as
+`~/.local/bin/python3.12` point to them. They belong to uv. The same goes for the package cache of npm in `~/.npm`
+and for the folders of Jupyter, `~/.jupyter`, `~/.ipython` and `~/Library/Jupyter` on macOS or
+`~/.local/share/jupyter` on Linux, which a Jupyter of your own shares. With the `dotnet` module, the SDK stays
+because it belongs to your system, and so do `~/.dotnet`, the package cache in `~/.nuget` and the folders in which
+the .NET language servers keep their own logs and caches. On Linux the Ubuntu packages that were installed after
+your yes stay as well. A few small caches can stay too, from tree-sitter, from ty and from the signature check in
+mise. `samebench remove` names all of them when they exist.

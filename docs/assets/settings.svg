@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="340" viewBox="0 0 1280 340" role="img" aria-labelledby="t d">
   <title id="t">Three layers of settings</title>
-  <desc id="d">A setting is decided in three layers, read from left to right, and the layer read last wins. First come the built-in defaults in bin/samebench, one for every setting, for example MODULES="core", LAYOUT="code", AGENT_CMD="", ICONS="unicode", ACTIVATE="global" and UPDATER="no". Then comes the profile, profiles/mac.sh or profiles/linux.sh. It is part of the repository, the same on every machine of that kind, chosen once with samebench apply mac, and it only lists what differs, here MODULES="core python", AGENT_CMD="claude" and ICONS="nerd". Last comes ~/.config/samebench/local.sh, which is outside the repository and concerns this machine only, here with MODULES="core python web dotnet", ACTIVATE="dev" and UPDATER="yes". The card on the right shows the values in effect on this machine, as samebench doctor shows them, each marked with the layer it comes from. A wire follows MODULES through every layer, from core to core python to core python web dotnet. A second wire follows ICONS, which changes from unicode to nerd in the profile and stays nerd because local.sh does not set it. Values that a later layer replaces are struck through.</desc>
+  <desc id="d">A setting is decided in three layers, read from left to right, and the layer read last wins. First come the built-in defaults in bin/samebench, one for every setting, for example MODULES="core", LAYOUT="code", AGENT_CMD="", ICONS="unicode", ACTIVATE="global", UPDATER="no" and NODE="samebench", and five more that the card only counts. Then comes the profile, profiles/mac.sh or profiles/linux.sh. It is part of the repository, the same on every machine of that kind, chosen once with samebench apply mac, and it only lists what differs, here MODULES="core python", AGENT_CMD="claude" and ICONS="nerd". Last comes ~/.config/samebench/local.sh, which is outside the repository and concerns this machine only, here with MODULES="core python web dotnet", ACTIVATE="dev" and UPDATER="yes". The card on the right shows the values in effect on this machine, as samebench doctor shows them, each marked with the layer it comes from. A wire follows MODULES through every layer, from core to core python to core python web dotnet. A second wire follows ICONS, which changes from unicode to nerd in the profile and stays nerd because local.sh does not set it. Values that a later layer replaces are struck through.</desc>
   <defs>
     <style>
       .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
@@ -29,8 +29,8 @@
     <rect x="264" y="182" width="52" height="8"/><rect x="574" y="182" width="52" height="8"/><rect x="914" y="182" width="52" height="8"/>
   </g>
 
-  <!-- Every card has the same rows: MODULES, LAYOUT, AGENT_CMD, ICONS, ACTIVATE, UPDATER and a last line for the
-       rest. A dotted row means that this layer does not set the setting, so the value from before stays. -->
+  <!-- Every card has the same rows: MODULES, LAYOUT, AGENT_CMD, ICONS, ACTIVATE, UPDATER and a last line with NODE and
+       the count of the rest. A dotted row means that this layer does not set the setting, so the value from before stays. -->
 
   <!-- 1: the built-in defaults, set in load_profile in bin/samebench before the profile is read -->
   <g>
@@ -48,7 +48,7 @@
       <text x="26" y="190" class="old">ICONS=<tspan text-decoration="line-through">"unicode"</tspan></text>
       <text x="26" y="218" class="old">ACTIVATE=<tspan text-decoration="line-through">"global"</tspan></text>
       <text x="26" y="246" class="old">UPDATER=<tspan text-decoration="line-through">"no"</tspan></text>
-      <text x="26" y="274" class="old"># … and 5 more</text>
+      <text x="26" y="274">NODE=<tspan class="val">"samebench"</tspan><tspan class="old"> # +5 more</tspan></text>
     </g>
     <text class="mono sub" x="16" y="318">used when no later layer sets it</text>
   </g>
@@ -121,7 +121,7 @@
       <text x="46" y="190">ICONS=<tspan class="val">"nerd"</tspan></text>
       <text x="46" y="218">ACTIVATE=<tspan class="val">"dev"</tspan></text>
       <text x="46" y="246">UPDATER=<tspan class="val">"yes"</tspan></text>
-      <text x="46" y="274" class="old"># … and 5 more</text>
+      <text x="46" y="274">NODE=<tspan class="val">"samebench"</tspan><tspan class="old"> # +5 more</tspan></text>
     </g>
     <rect class="pill" x="12" y="303" width="136" height="22" rx="11"/>
     <text class="mono" x="80" y="318" text-anchor="middle" font-size="11" fill="#c8d3f5"><tspan fill="#8ff0c8">❯</tspan> samebench doctor</text>

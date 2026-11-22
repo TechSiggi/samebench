@@ -66,9 +66,11 @@ Full version with everything: docs/cheatsheet.md
 
 ## Shell
 
-| Command            | Action                                  |
-|--------------------|-----------------------------------------|
-| `dev`, `dev -j`    | open workspace, with Jupyter            |
-| `dev -s`, `-k`     | list sessions, stop this one            |
-| `jlab`             | open JupyterLab                         |
-| `samebench doctor` | check this machine                      |
+| Command             | Action                                  |
+|---------------------|-----------------------------------------|
+| `dev`, `dev -j`     | open workspace, with Jupyter            |
+| `dev -s`, `-k`      | list sessions, stop this one            |
+| `jlab`              | open JupyterLab                         |
+| `samebench doctor`  | check this machine                      |
+| `samebench mise ls` | tools of the mise of samebench          |
+| `samebench remove`  | undo the setup, `--all` deletes all     |

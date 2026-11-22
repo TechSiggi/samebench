@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# The mise of samebench, with folders of its own.
+#
+#   libexec/mise <arguments for mise>      (from a shell: samebench mise <arguments>)
+#
+# samebench installs its own copy of mise and keeps the program, its configuration, its tools,
+# its state and its cache inside the folders of samebench. A mise of your own, with
+# ~/.config/mise and ~/.local/share/mise, is never read and never changed, and
+# `samebench remove` takes this one away completely.
+#
+# This mise only reads the configuration that `samebench apply` links for it (config.toml,
+# mise.lock and conf.d in ~/.config/samebench/mise). It reads no mise.toml and no .tool-versions,
+# neither from a project folder nor from your home folder. Every call goes through this file:
+# bin/samebench, bin/dev and ~/.config/samebench/env.sh.
+set -euo pipefail
+
+data="${XDG_DATA_HOME:-$HOME/.local/share}/samebench"
+bin="$data/bin/mise"
+if [ ! -x "$bin" ]; then
+  echo "samebench: mise is not installed yet, run 'samebench apply <profile>' first." >&2
+  exit 127
+fi
+
+# What a mise of your own left in this shell must not steer this one: the state of its
+# activation and the settings that name another configuration.
+for v in $(compgen -v __MISE_ || true) MISE_SHELL MISE_ENV MISE_GLOBAL_CONFIG_FILE MISE_GLOBAL_CONFIG_ROOT; do
+  unset "$v"
+done
+
+export MISE_CONFIG_DIR="$HOME/.config/samebench/mise"
+export MISE_DATA_DIR="$data/mise"
+export MISE_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/samebench/mise"
+export MISE_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/samebench/mise"
+# mise looks for configuration files in the current folder and every folder above it, which
+# from the home folder includes ~/.config/mise/config.toml and ~/.tool-versions. A name that
+# no file has turns that search off. It also runs in the home folder, so no project folder is
+# ever part of the search.
+export MISE_OVERRIDE_CONFIG_FILENAMES=".samebench-reads-no-project-config"
+export MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES="none"
+
+cd "$HOME"
+exec "$bin" "$@"

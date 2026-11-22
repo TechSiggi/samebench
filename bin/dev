@@ -56,9 +56,10 @@ name="$(printf '%s' "$name" | tr -c 'A-Za-z0-9_-' '_')"
 venv_tracked() { [ -n "$(git -C "$dir" ls-files .venv 2>/dev/null | head -1)" ]; }
 
 # Always use the tools from mise (tmux, nvim, uv), even when the shell hasn't
-# activated them (activation "dev") or another uv or tmux comes first.
+# activated them (activation "dev") or another uv or tmux comes first. The mise of samebench
+# has folders of its own and is only called through libexec/mise.
 export PATH="$HOME/.local/bin:$PATH"
-if command -v mise >/dev/null 2>&1; then eval "$(cd "$HOME" && mise env -s bash)"; fi
+eval "$("$SAMEBENCH_REPO/libexec/mise" env -s bash 2>/dev/null || true)"
 command -v tmux >/dev/null 2>&1 || die "tmux is missing, run 'samebench apply'."
 export NVIM_APPNAME="samebench-nvim" SAMEBENCH_REPO
 export UV_PYTHON_DOWNLOADS="${SAMEBENCH_UV_PYTHON_DOWNLOADS:-manual}"

@@ -51,6 +51,7 @@ with the repository set the same three, `MODULES="core python"`, `AGENT_CMD="cla
 | `ACTIVATE` | `global` | `global` · `dev` | Tools from mise in every shell, or only inside `dev` sessions |
 | `CHECK` | `daily` | `daily` · `off` | The daily security and repository check when `dev` starts |
 | `TRUST` | `ask` | `ask` · `all` | Whether `dev` asks once per project folder before the editor may load code from it, or allows that everywhere without asking. See [trusted project folders](#trusted-project-folders) |
+| `NODE` | `samebench` | `samebench` · `system` | With the `web` module, whether samebench brings its own Node.js and keeps it patched, or uses the Node.js on your `PATH` and installs none. See [the web module](#the-web-module) |
 | `DOTNET_SDK` | `"10.0 11.0"` | one or more .NET versions, separated by spaces | The .NET SDK versions you want on a machine with the `dotnet` module. `samebench` checks for them and never installs one without asking. See [the dotnet module](#the-dotnet-module) |
 | `UPDATER` | `no` | `yes` · `no` | Whether this machine maintains the lockfiles, usually set in `local.sh` |
 
@@ -68,13 +69,27 @@ ACTIVATE="dev"     # tools from mise only inside dev sessions
 JUPYTER="no"       # never install Jupyter here
 ```
 
+`samebench` never creates this file, you do. The folder `~/.config/samebench` appears with the first
+`samebench apply`, so afterwards you only write the file and run `samebench apply` again. It shows what changes and
+waits for your yes.
+
+A setting that should already count for the first setup, for example the modules, needs the folder before that
+first run. Create it yourself, write the file and then run `samebench apply <profile>` once.
+
+```bash
+mkdir -p ~/.config/samebench
+echo 'MODULES="core python web dotnet"' > ~/.config/samebench/local.sh
+```
+
+The `echo` line replaces the whole file. Open it in an editor instead when it already holds other settings.
+
 For tmux, `~/.config/tmux/local.conf` works the same way.
 
 ## Modules
 
 A module groups tools that belong together. `core` brings Neovim, tmux, lazygit, ripgrep, fd and tree-sitter.
-`python` adds uv, ruff and ty, plus the Python settings for Neovim. `web` is optional and adds Node.js and the
-language servers for TypeScript and Angular frontends. `dotnet` is optional too and adds C# editing for .NET
+`python` adds uv, ruff and ty, plus the Python settings for Neovim. `web` is optional and adds Node.js, or uses yours, and
+the language servers for TypeScript and Angular frontends. `dotnet` is optional too and adds C# editing for .NET
 backends.
 
 To add a module of your own, for example `go`, create `modules/go/tools.toml` with the tools mise should install.
@@ -91,8 +106,27 @@ No profile turns this module on. Add it on the machines where you work on fronte
 MODULES="core python web"
 ```
 
-The module brings two things. Node.js comes through mise, with one major version pinned in
-[`modules/web/tools.toml`](../modules/web/tools.toml). The language servers come from the package list in
+The module brings two things, Node.js and the language servers. Node.js runs the language servers, npm and the
+Angular CLI of your projects, and the setting `NODE` decides where it comes from.
+
+- With `NODE="samebench"`, the default, Node.js comes through mise, with one major version pinned in
+  [`modules/web/tools.toml`](../modules/web/tools.toml), and update day keeps it patched. Another Node.js on the
+  machine, for example from nvm, Homebrew or apt, stays where it is. `samebench plan` and `samebench doctor` name
+  it with its version and path, because samebench only updates its own. Patching the other one stays your job,
+  and samebench never removes it.
+- With `NODE="system"`, samebench installs no Node.js. It uses the `node` and `npm` on your `PATH` to install and
+  run the language servers, which needs Node.js 22 or newer and an npm that knows the `allow-git` setting. When
+  that is missing, `samebench apply` says why and leaves the language servers out, and the rest of the setup goes
+  on. You keep this Node.js up to date yourself, and the [daily check](updates-and-security.md#the-daily-check)
+  tells you about advisories for it.
+
+```bash
+# ~/.config/samebench/local.sh
+MODULES="core python web"
+NODE="system"      # use the Node.js of this machine
+```
+
+The language servers come from the package list in
 [`envs/web`](../envs/web), which holds vtsls for TypeScript and JavaScript, the Angular language server, TypeScript
 itself and the servers for HTML, CSS, SCSS, JSON and ESLint. `samebench apply` installs them with `npm ci` into
 `~/.local/share/samebench/web-lsp`, exactly as `envs/web/package-lock.json` says, and Neovim starts them from there.

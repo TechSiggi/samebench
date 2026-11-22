@@ -53,7 +53,7 @@ JupyterLab too. The project you work in stays exactly as it is.
 
 ### Plays well with what you have
 
-Neovim and tmux run in their own folders and their own server, so an existing setup keeps working.
+Neovim, tmux and mise keep to their own folders and tmux runs its own server, so an existing setup keeps working.
 `samebench plan` shows every change before it happens, and `samebench remove` undoes all of it.
 
 </td>
@@ -237,7 +237,9 @@ each machine only gets the modules you list for it.
 | [`dotnet`](docs/configuration.md#the-dotnet-module) | C# and .NET | C# editing with the Roslyn language server and keys to build, run and test. The .NET SDK comes from your system | When you add it |
 
 To add a module, list it in `local.sh` and run `samebench apply` again. It shows what the module would install
-and waits for your yes.
+and waits for your yes. You create that file yourself, and
+[settings for one machine only](docs/configuration.md#settings-for-one-machine-only) shows how, also before the
+first setup.
 
 ```bash
 # ~/.config/samebench/local.sh
@@ -289,6 +291,7 @@ The full story is in [updates and security](docs/updates-and-security.md).
 | `samebench update` · `samebench sync` | Monthly update on one machine · bring the others up to date |
 | `samebench check` · `samebench fix` | Look for vulnerabilities · lift one package to its fixed version |
 | `samebench doctor` · `samebench remove` | Check the state of this machine · undo everything |
+| `samebench mise ls` · `samebench remove --all` | Ask the mise of samebench · also delete its programs and data |
 
 `dev` runs on its own tmux server, so a plain `tmux ls` doesn't list these sessions. `dev -s` does, and inside a
 session <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>s</kbd> shows the same list. Every key for Neovim, tmux, lazygit,

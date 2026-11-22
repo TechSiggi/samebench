@@ -5,6 +5,8 @@
 # (package-lock.json with integrity hashes).
 # One major version on purpose, changing it is a deliberate decision. Projects keep their own
 # Angular version, npm packages and lockfile.
+# With NODE="system" in the profile this file is not linked, and samebench uses the Node.js of
+# your system without installing or updating one.
 
 [tools]
 "core:node" = "24" # runs the language servers, npm and the Angular CLI of your projects (LTS)
