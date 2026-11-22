@@ -1,8 +1,20 @@
 <div align="center">
 
-# Cheat sheet
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/head-cheatsheet-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/head-cheatsheet-light.svg">
+  <img alt="Cheat sheet. Every key for Neovim, tmux, lazygit, notebooks and .NET." src="assets/head-cheatsheet-dark.svg" width="100%">
+</picture>
 
-**Neovim** &nbsp;·&nbsp; **tmux** &nbsp;·&nbsp; **lazygit** &nbsp;·&nbsp; **Notebooks** &nbsp;·&nbsp; **.NET**
+<br>
+
+**[Getting around](#getting-around)** &nbsp;·&nbsp;
+**[Editing](#editing)** &nbsp;·&nbsp;
+**[Windows and panes](#windows-and-panes)** &nbsp;·&nbsp;
+**[Git](#git)** &nbsp;·&nbsp;
+**[Notebooks](#notebooks)** &nbsp;·&nbsp;
+**[.NET](#net)** &nbsp;·&nbsp;
+**[Commands](#commands)**
 
 <sub><kbd>Space</kbd> is the leader key. Press it, wait a moment, and which-key shows what comes next.<br>
 Inside Neovim, <kbd>Space</kbd> <kbd>H</kbd> opens the <a href="quickref.md">short version</a> of this page.</sub>
@@ -59,7 +71,7 @@ Inside Neovim, <kbd>Space</kbd> <kbd>H</kbd> opens the <a href="quickref.md">sho
 | <kbd>Space</kbd> <kbd>\|</kbd> · <kbd>Space</kbd> <kbd>-</kbd> | Split side by side · on top of each other |
 | <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>z</kbd> | Zoom the pane, again to restore |
 | <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> | Switch tmux window |
-| <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>s</kbd> | Switch between sessions |
+| <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>s</kbd> · <kbd>L</kbd> | Pick a session · back to the last one |
 | <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>d</kbd> | Leave the session, it keeps running |
 | <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>[</kbd> | Scroll and copy, <kbd>q</kbd> ends it |
 | <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>Ctrl</kbd>+<kbd>l</kbd> | Clear the pane |

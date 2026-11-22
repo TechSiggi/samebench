@@ -1,0 +1,186 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="368" viewBox="0 0 1280 368" role="img" aria-labelledby="t d">
+  <title id="t">Port forwarding to a Linux VM</title>
+  <desc id="d">On the left is the computer you sit at. Its browser opens 127.0.0.1:8888 for JupyterLab, https://localhost:4200 for the Angular frontend and localhost:5001 for the .NET backend, and its terminal only runs ssh my-vm. On the right is the VM, where everything runs. JupyterLab from dev -j listens on 127.0.0.1:8888, ng serve --ssl on 127.0.0.1:4200 and dotnet run on 127.0.0.1:5001, next to Neovim, the agent, lazygit and the kernels. In the middle, one SSH connection carries three wires, one for each LocalForward line in the SSH config, which also says ForwardAgent no. Both ends listen only on 127.0.0.1, so other devices on your network can't reach any of these ports.</desc>
+  <defs>
+    <style>
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .win { fill: #14162a; stroke: #2a2e45; }
+      .act { fill: #16182a; stroke: #8ff0c8; }
+      .ina { fill: #1c1f33; stroke: #3b4261; }
+      .row { fill: #14162a; stroke-opacity: 0.55; }
+      .lbl { font-size: 13px; font-weight: 700; }
+      .sub { font-size: 11px; fill: #6b7089; }
+      .code { font-size: 11.5px; fill: #c8d3f5; }
+      .pill { fill: #2a2e45; }
+      .band { fill: #14162a; stroke: #2a2e45; }
+      .hull { fill: none; stroke: #2a2e45; stroke-width: 8; }
+      .tube { fill: none; stroke: #14162a; stroke-width: 6; }
+      .wire { fill: none; stroke-width: 2; }
+      .plug { stroke: #14162a; stroke-width: 2; }
+    </style>
+    <g id="dots"><circle cx="18" cy="16" r="4.5" fill="#ff757f"/><circle cx="34" cy="16" r="4.5" fill="#ffc27a"/><circle cx="50" cy="16" r="4.5" fill="#c3e88d"/></g>
+    <!-- padlock, takes its colour from the color attribute of the use element -->
+    <g id="lock">
+      <path d="M3.5 9 V6 a4.5 4.5 0 0 1 9 0 V9" fill="none" stroke="currentColor" stroke-width="2"/>
+      <rect x="0" y="9" width="16" height="12" rx="3" fill="currentColor"/>
+      <circle cx="8" cy="15" r="1.6" fill="#14162a"/>
+    </g>
+    <!-- the three wires, one per LocalForward line, from an address in the browser to the server on the VM -->
+    <path id="w1" d="M374 97 C430 97 430 145 486 145 H794 C850 145 850 97 906 97"/>
+    <path id="w2" d="M374 159 H906"/>
+    <path id="w3" d="M374 221 C430 221 430 173 486 173 H794 C850 173 850 221 906 221"/>
+  </defs>
+
+  <!-- The SSH connection: one band on the page that carries the three wires. Each wire also has its own dark
+       tube, so the parts that fan out read on a light and a dark page. Drawn first, the windows cover the ends. -->
+  <rect class="band" x="462" y="133" width="356" height="52" rx="26"/>
+  <g class="hull"><use href="#w1"/><use href="#w2"/><use href="#w3"/></g>
+  <g class="tube"><use href="#w1"/><use href="#w2"/><use href="#w3"/></g>
+
+  <!-- Left: the computer you sit at. A browser with one address per forwarded port, and a terminal that only runs ssh. -->
+  <g>
+    <rect class="win" width="400" height="368" rx="14"/>
+    <use href="#dots"/>
+    <text class="mono lbl" x="200" y="21" text-anchor="middle" fill="#8ff0c8">your computer</text>
+
+    <rect class="ina" x="12" y="34" width="376" height="226" rx="8"/>
+    <text class="mono lbl" x="26" y="56" fill="#c8d3f5">browser</text>
+    <text class="mono sub" x="90" y="56">one address per forwarded port</text>
+
+    <rect class="row" x="26" y="70" width="348" height="54" rx="8" stroke="#ffc27a"/>
+    <text class="mono lbl" x="40" y="91" fill="#ffc27a">JupyterLab</text>
+    <text class="mono sub" x="360" y="91" text-anchor="end">also 8889 and 8890</text>
+    <rect class="pill" x="40" y="99" width="178" height="18" rx="9"/>
+    <text class="mono code" x="50" y="112">127.0.0.1:8888/lab</text>
+    <text class="mono sub" x="230" y="112">with its token</text>
+
+    <rect class="row" x="26" y="132" width="348" height="54" rx="8" stroke="#ff9ecf"/>
+    <text class="mono lbl" x="40" y="153" fill="#ff9ecf">Angular frontend</text>
+    <rect class="pill" x="40" y="161" width="178" height="18" rx="9"/>
+    <text class="mono code" x="50" y="174">https://localhost:4200</text>
+    <text class="mono sub" x="230" y="174">self-signed</text>
+
+    <rect class="row" x="26" y="194" width="348" height="54" rx="8" stroke="#8ec5ff"/>
+    <text class="mono lbl" x="40" y="215" fill="#8ec5ff">.NET backend</text>
+    <rect class="pill" x="40" y="223" width="178" height="18" rx="9"/>
+    <text class="mono code" x="50" y="236">localhost:5001</text>
+    <text class="mono sub" x="230" y="236">example port</text>
+
+    <rect class="act" x="12" y="268" width="376" height="88" rx="8"/>
+    <text class="mono lbl" x="26" y="290" fill="#8ff0c8">terminal</text>
+    <text class="mono sub" x="98" y="290">PowerShell or the macOS Terminal</text>
+    <text class="mono" x="26" y="318" font-size="13" fill="#c8d3f5"><tspan fill="#8ff0c8">❯</tspan> ssh my-vm</text>
+    <text class="mono sub" x="26" y="342">the only thing you run on this computer</text>
+  </g>
+
+  <!-- Right: the VM. Each server listens on 127.0.0.1 there, in its own dev session. -->
+  <g transform="translate(880 0)">
+    <rect class="win" width="400" height="368" rx="14"/>
+    <use href="#dots"/>
+    <text class="mono lbl" x="200" y="21" text-anchor="middle" fill="#8ff0c8">ssh my-vm</text>
+
+    <rect class="ina" x="12" y="34" width="376" height="226" rx="8"/>
+    <text class="mono lbl" x="26" y="56" fill="#c8d3f5">servers</text>
+    <text class="mono sub" x="90" y="56">each in its own dev session</text>
+
+    <rect class="row" x="26" y="70" width="348" height="54" rx="8" stroke="#ffc27a"/>
+    <text class="mono lbl" x="40" y="91" fill="#ffc27a">dev -j</text>
+    <text class="mono sub" x="96" y="91">runs JupyterLab</text>
+    <text class="mono sub" x="40" y="112">listens on</text>
+    <rect class="pill" x="114" y="99" width="118" height="18" rx="9"/>
+    <text class="mono code" x="173" y="112" text-anchor="middle">127.0.0.1:8888</text>
+
+    <rect class="row" x="26" y="132" width="348" height="54" rx="8" stroke="#ff9ecf"/>
+    <text class="mono lbl" x="40" y="153" fill="#ff9ecf">ng serve --ssl</text>
+    <text class="mono sub" x="158" y="153">in shop-web</text>
+    <text class="mono sub" x="40" y="174">listens on</text>
+    <rect class="pill" x="114" y="161" width="118" height="18" rx="9"/>
+    <text class="mono code" x="173" y="174" text-anchor="middle">127.0.0.1:4200</text>
+
+    <rect class="row" x="26" y="194" width="348" height="54" rx="8" stroke="#8ec5ff"/>
+    <text class="mono lbl" x="40" y="215" fill="#8ec5ff">dotnet run</text>
+    <text class="mono sub" x="128" y="215">in shop-api</text>
+    <text class="mono sub" x="40" y="236">listens on</text>
+    <rect class="pill" x="114" y="223" width="118" height="18" rx="9"/>
+    <text class="mono code" x="173" y="236" text-anchor="middle">127.0.0.1:5001</text>
+
+    <!-- everything else runs on the VM as well, and keeps running when the connection drops -->
+    <rect class="ina" x="12" y="268" width="376" height="88" rx="8"/>
+    <text class="mono lbl" x="26" y="290" fill="#c8d3f5">everything runs here</text>
+    <g class="mono code">
+      <rect class="pill" x="26" y="300" width="62" height="22" rx="11"/><text x="57" y="315" text-anchor="middle">Neovim</text>
+      <rect class="pill" x="96" y="300" width="84" height="22" rx="11"/><text x="138" y="315" text-anchor="middle" fill="#ffc27a">the agent</text>
+      <rect class="pill" x="188" y="300" width="70" height="22" rx="11"/><text x="223" y="315" text-anchor="middle" fill="#c3a6ff">lazygit</text>
+      <rect class="pill" x="266" y="300" width="98" height="22" rx="11"/><text x="315" y="315" text-anchor="middle" fill="#8ff0c8">the kernels</text>
+    </g>
+    <text class="mono sub" x="26" y="342">and keeps running when the connection drops</text>
+  </g>
+
+  <!-- Middle, above the connection: the lines of the SSH config on your computer that make the three wires. -->
+  <g>
+    <rect class="win" x="490" y="0" width="300" height="120" rx="14"/>
+    <text class="mono lbl" x="506" y="22" fill="#8ff0c8">~/.ssh/config</text>
+    <text class="mono sub" x="774" y="22" text-anchor="end">on your computer</text>
+    <g class="mono code">
+      <text x="506" y="44"><tspan fill="#c3a6ff">Host</tspan> my-vm</text>
+      <text x="506" y="60" xml:space="preserve">  ForwardAgent <tspan fill="#c3e88d">no</tspan></text>
+      <text x="506" y="76" xml:space="preserve">  LocalForward <tspan fill="#ffc27a">8888</tspan> 127.0.0.1:<tspan fill="#ffc27a">8888</tspan></text>
+      <text x="506" y="92" xml:space="preserve">  LocalForward <tspan fill="#ff9ecf">4200</tspan> 127.0.0.1:<tspan fill="#ff9ecf">4200</tspan></text>
+      <text x="506" y="108" xml:space="preserve">  LocalForward <tspan fill="#8ec5ff">5001</tspan> 127.0.0.1:<tspan fill="#8ec5ff">5001</tspan></text>
+    </g>
+  </g>
+
+  <!-- Middle, below the connection: both ends only listen on 127.0.0.1, so nothing is reachable from the network. -->
+  <g>
+    <rect class="win" x="490" y="198" width="300" height="170" rx="14"/>
+    <text class="mono lbl" x="506" y="222" fill="#8ff0c8">127.0.0.1 at both ends</text>
+    <text class="mono sub" x="506" y="251">forwards on your computer</text>
+    <rect class="pill" x="690" y="236" width="84" height="22" rx="11"/>
+    <text class="mono code" x="732" y="251" text-anchor="middle">127.0.0.1</text>
+    <text class="mono sub" x="506" y="279">servers on the VM</text>
+    <rect class="pill" x="690" y="264" width="84" height="22" rx="11"/>
+    <text class="mono code" x="732" y="279" text-anchor="middle">127.0.0.1</text>
+    <rect x="506" y="298" width="268" height="1" fill="#2a2e45"/>
+    <!-- a red cross: the network stays outside -->
+    <g transform="translate(514 323)" stroke="#ff757f" stroke-width="2" stroke-linecap="round" fill="none">
+      <circle r="8"/><path d="M-3.5 -3.5 L3.5 3.5 M3.5 -3.5 L-3.5 3.5"/>
+    </g>
+    <text class="mono code" x="532" y="322">other devices on your network</text>
+    <text class="mono sub" x="532" y="340">can't reach any of these ports</text>
+  </g>
+
+  <!-- The three wires and their plugs, on top of the windows -->
+  <g class="wire">
+    <use href="#w1" stroke="#ffc27a"/><use href="#w2" stroke="#ff9ecf"/><use href="#w3" stroke="#8ec5ff"/>
+  </g>
+  <g class="plug">
+    <circle cx="374" cy="97" r="5" fill="#ffc27a"/><circle cx="906" cy="97" r="5" fill="#ffc27a"/>
+    <circle cx="374" cy="159" r="5" fill="#ff9ecf"/><circle cx="906" cy="159" r="5" fill="#ff9ecf"/>
+    <circle cx="374" cy="221" r="5" fill="#8ec5ff"/><circle cx="906" cy="221" r="5" fill="#8ec5ff"/>
+  </g>
+
+  <!-- Every 9 seconds a request travels from each address in the browser to its server, one wire after the other.
+       The lights are invisible in the first frame, so a still image shows the plain picture. -->
+  <g fill="#eef1ff">
+    <circle r="3.5" opacity="0">
+      <animateMotion dur="9s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.04;0.24;1"><mpath href="#w1"/></animateMotion>
+      <animate attributeName="opacity" dur="9s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.04;0.06;0.22;0.24;1"/>
+    </circle>
+    <circle r="3.5" opacity="0">
+      <animateMotion dur="9s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.37;0.57;1"><mpath href="#w2"/></animateMotion>
+      <animate attributeName="opacity" dur="9s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.37;0.39;0.55;0.57;1"/>
+    </circle>
+    <circle r="3.5" opacity="0">
+      <animateMotion dur="9s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.70;0.90;1"><mpath href="#w3"/></animateMotion>
+      <animate attributeName="opacity" dur="9s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.70;0.72;0.88;0.90;1"/>
+    </circle>
+  </g>
+
+  <!-- The SSH connection itself, on top of the wires. They run through it, and the lights vanish inside. -->
+  <g>
+    <rect x="586" y="137" width="108" height="44" rx="12" fill="#1c1f33" stroke="#3b4261"/>
+    <use href="#lock" x="598" y="148" color="#8ff0c8"/>
+    <text class="mono lbl" x="624" y="156" fill="#c8d3f5">SSH</text>
+    <text class="mono sub" x="624" y="171">port 22</text>
+  </g>
+</svg>

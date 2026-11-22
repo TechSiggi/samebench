@@ -6,15 +6,6 @@
   <img alt="samebench, the same workbench on every machine, one secure terminal workspace for Mac, Linux and WSL" src="docs/assets/banner-dark.svg" width="100%">
 </picture>
 
-<br>
-
-**[Install](docs/installation.md)** &nbsp;·&nbsp;
-**[Daily use](docs/daily-use.md)** &nbsp;·&nbsp;
-**[Notebooks](docs/notebooks.md)** &nbsp;·&nbsp;
-**[Modules](#modules)** &nbsp;·&nbsp;
-**[Security](docs/updates-and-security.md)** &nbsp;·&nbsp;
-**[Cheat sheet](docs/cheatsheet.md)**
-
 </div>
 
 <br>
@@ -26,7 +17,7 @@ language servers for TypeScript and Angular frontends, the other C# editing for 
 installs comes from a pinned list and waits for your yes.
 
 <p align="center">
-  <img alt="The three layouts started by dev: code, agent and code with Jupyter" src="docs/assets/layouts.svg" width="100%">
+  <img alt="The three layouts started by dev: the code layout, the code layout with Jupyter, where JupyterLab in the browser shares a kernel with the console below Neovim, and the agent layout" src="docs/assets/layouts.svg" width="100%">
 </p>
 
 <table>
@@ -69,6 +60,170 @@ Neovim and tmux run in their own folders and their own server, so an existing se
 </tr>
 </table>
 
+<br>
+
+<div align="center">
+
+**[Install](#install)** &nbsp;·&nbsp;
+**[A day with it](#a-day-with-it)** &nbsp;·&nbsp;
+**[Frontend and backend](#frontend-and-backend-side-by-side)** &nbsp;·&nbsp;
+**[Notebooks](#notebooks)** &nbsp;·&nbsp;
+**[Modules](#modules)** &nbsp;·&nbsp;
+**[Security](#security-in-one-picture)** &nbsp;·&nbsp;
+**[Commands](#commands)**
+
+</div>
+
+## Install
+
+Three commands set up a machine. `samebench apply` checks the system, shows you a plan of everything it would
+install and waits for your okay.
+
+<details open>
+<summary><b>macOS</b></summary>
+
+<br>
+
+```bash
+xcode-select --install
+git clone https://github.com/TechSiggi/samebench ~/Development/samebench
+~/Development/samebench/bin/samebench apply mac
+```
+
+After your yes `samebench apply` downloads a single program itself, the version manager
+[mise](https://mise.jdx.dev), and compares it with a SHA-256 sum pinned in `bin/samebench`. Everything else comes
+through mise from the lockfiles.
+
+</details>
+
+<details>
+<summary><b>Linux (Ubuntu or Debian, also a VM over SSH)</b></summary>
+
+<br>
+
+```bash
+sudo apt-get update && sudo apt-get install -y git curl ca-certificates build-essential unattended-upgrades
+git clone https://github.com/TechSiggi/samebench ~/samebench
+~/samebench/bin/samebench apply linux
+```
+
+You don't need Python from apt. When a project needs Python, uv asks before it installs one.
+`unattended-upgrades` keeps the system packages patched with the distribution's signed security updates. If you
+connect over SSH, add the [port forwarding](docs/installation.md#linux-vm-over-ssh) to your local SSH config, so
+that JupyterLab and your development servers open in your local browser.
+
+</details>
+
+<details>
+<summary><b>WSL on Windows</b></summary>
+
+<br>
+
+Use the Linux steps inside your WSL distribution and keep the repository and your projects in the Linux file system
+(`~/…`), not under `/mnt/c`. The [installation guide](docs/installation.md#wsl-on-windows) explains how to limit
+what WSL processes can reach on the Windows side.
+
+</details>
+
+Two things are left after that, on every system. The icons need a Nerd Font in your terminal.
+[Ghostty](https://ghostty.org) ships them already. Without such a font, put `ICONS="unicode"` into
+`~/.config/samebench/local.sh` and run `samebench apply` again to get plain characters. Your coding agent is not
+part of the setup either. For Claude Code, use the official installer from Anthropic, read the script first, and
+turn on `/sandbox` once inside Claude. Then open a new terminal and type `dev` in any project folder.
+
+> [!TIP]
+> Already have Neovim, tmux, uv or Jupyter on that machine? They stay untouched. Run `bin/samebench plan mac` or
+> `bin/samebench plan linux` first to see exactly what would change, and read
+> [machines with an existing setup](docs/installation.md#machines-with-an-existing-setup).
+
+## A day with it
+
+```bash
+cd ~/projects/demo
+dev
+```
+
+`dev` opens the workspace for the folder you are in, with Neovim on top, a terminal at the bottom left and your
+agent at the bottom right. Every workspace is a tmux session named after its folder, and it keeps running until
+you stop it. Leave it at any time, and the next `dev` in that folder puts you back in front of the editor, the
+agent and every running program, exactly as you left them. That also holds when an SSH connection drops.
+
+| You want to | Do this |
+|---|---|
+| Move between the editor, the terminal and the agent | <kbd>Ctrl</kbd>+<kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd> |
+| Give one pane the whole screen, and take it back | <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>z</kbd> |
+| Find a file, or open the file explorer | <kbd>Space</kbd> <kbd>Space</kbd>, or <kbd>Space</kbd> <kbd>e</kbd> |
+| Commit and push with lazygit | <kbd>Space</kbd> <kbd>g</kbd> <kbd>g</kbd> in the editor, or <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>g</kbd> from any pane |
+| Get a free shell | <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>2</kbd> opens the `shell` window, or <kbd>3</kbd> in a session with Jupyter. <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>1</kbd> goes back |
+| Leave, and let everything keep running | <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>d</kbd> |
+| Stop for today | `dev -k`, which doesn't ask, so save with `:wa` first |
+| See every key at the point you are at | Press <kbd>Space</kbd> and wait a moment, or <kbd>Space</kbd> <kbd>H</kbd> for the short cheat sheet |
+
+`dev -l agent` opens the other layout from the picture at the top, with the agent on the left and Neovim on the
+right for reviewing. In a Python project the `.venv` of the folder is active in the whole session, so the editor,
+the agent and the terminal all see its packages.
+
+### Frontend and backend side by side
+
+A full-stack project gets one session per repository, for example an Angular frontend in `shop-web` and a .NET
+backend in `shop-api`. With the `web` and `dotnet` [modules](#modules) turned on, four steps bring both up.
+
+| | Where you are | What you type |
+|:---:|---|---|
+| 1 | Your terminal | `dev ~/projects/shop-api` |
+| 2 | The terminal pane of `shop-api` | `dev ~/projects/shop-web` |
+| 3 | The terminal pane of `shop-web` | `npx ng serve` |
+| 4 | Back in `shop-api` with <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>s</kbd>, in its terminal pane | `dotnet run` |
+
+The second `dev` builds the frontend session and takes you straight into it, while the backend session stays
+open behind it. From then on three keys are all you need.
+
+<p align="center">
+  <img alt="Two dev sessions side by side, shop-api with dotnet run and shop-web with npx ng serve in their terminal panes, each with its own Neovim and agent. Between them the three keys: Ctrl+b then s shows the list of both sessions, Ctrl+b then L jumps back to the last one, and Ctrl+b then d leaves while both keep running" src="docs/assets/sessions.svg" width="100%">
+</p>
+
+| Keys | What happens |
+|---|---|
+| <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>s</kbd> | Shows both sessions. Pick one with the arrow keys and <kbd>Enter</kbd> |
+| <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>L</kbd> | Jumps straight back to the session you came from |
+| <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>d</kbd> | Leaves tmux. Both sessions and both servers keep running, and `dev` in either folder takes you back |
+
+Each session has its own editor, its own agent and its own server, so you never restart one to look at the other.
+The servers keep the two terminal panes busy. For `npm ci`, `dotnet test` and everything else, use the `shell`
+window of the session with <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>2</kbd>. <kbd>Ctrl</kbd>+<kbd>c</kbd> stops a
+server, and `dev -k` stops the whole session of the folder you are in.
+
+Three things are worth knowing.
+
+- The first `dev` in each of the two folders asks whether you trust it, because the language servers load code
+  from the project. Say yes for your own projects.
+  [Opening someone else's repository](docs/updates-and-security.md#opening-someone-elses-repository) says what a
+  yes allows.
+- `dev` brings the language servers and never starts your application. It never installs a project's packages
+  either, so `npm ci` and `dotnet restore` stay with you. Inside the editor, <kbd>Space</kbd> <kbd>D</kbd> opens
+  the .NET keys to build, run and test.
+- On a VM over SSH, [forward the ports](docs/installation.md#a-frontend-development-server-on-the-vm) of the two
+  servers to open the application in your local browser.
+
+### Notebooks
+
+```bash
+dev -j          # like dev, plus JupyterLab and a kernel for this project
+jlab            # open JupyterLab in the browser, already logged in
+```
+
+Inside Neovim, <kbd>Space</kbd> <kbd>j</kbd> <kbd>k</kbd> turns the terminal below into a console attached to the
+notebook's kernel, and <kbd>Space</kbd> <kbd>j</kbd> <kbd>j</kbd> runs the current cell. Open the same notebook in
+the browser and every variable is already there.
+
+<p align="center">
+  <img alt="JupyterLab in the browser and the kernel console below Neovim are attached to one kernel, which runs from the project's .venv" src="docs/assets/kernel.svg" width="100%">
+</p>
+
+The kernel runs from the project's own `.venv`. `dev -j` builds it with `uv sync --frozen`, exactly as the
+project's `uv.lock` says, and asks you once before it installs those packages. The
+[notebook guide](docs/notebooks.md) covers the questions `dev -j` asks, the cell keys and working in the browser.
+
 ## Modules
 
 Neovim, tmux, lazygit and the agent are the same on every machine. Support for a language comes as a module, and
@@ -94,107 +249,6 @@ CLI come from each project's `package.json`, and NuGet packages from the project
 
 Your daily commands stay the same with every module. A plain `dev` in an Angular or a .NET project starts the
 right language servers, and the first time it asks whether you trust the folder.
-
-## Quick start
-
-<details open>
-<summary><b>macOS</b></summary>
-
-<br>
-
-```bash
-xcode-select --install
-git clone https://github.com/TechSiggi/samebench ~/Development/samebench
-~/Development/samebench/bin/samebench apply mac
-```
-
-`samebench apply` checks the system, shows you a plan of everything it would install and waits for your okay. After
-your yes it downloads a single program itself, the version manager [mise](https://mise.jdx.dev), and compares it
-with a SHA-256 sum pinned in `bin/samebench`. Everything else comes through mise from the lockfiles. Open a new
-terminal afterwards and type `dev` in any project folder.
-
-</details>
-
-<details>
-<summary><b>Linux (Ubuntu or Debian, also a VM over SSH)</b></summary>
-
-<br>
-
-```bash
-sudo apt-get update && sudo apt-get install -y git curl ca-certificates build-essential unattended-upgrades
-git clone https://github.com/TechSiggi/samebench ~/samebench
-~/samebench/bin/samebench apply linux
-```
-
-You don't need Python from apt. When a project needs Python, uv asks before it installs one. If you connect over
-SSH, add the [port forwarding for JupyterLab](docs/installation.md#linux-vm-over-ssh) to your local SSH config.
-
-</details>
-
-<details>
-<summary><b>WSL on Windows</b></summary>
-
-<br>
-
-Use the Linux steps inside your WSL distribution and keep the repository and your projects in the Linux file system
-(`~/…`), not under `/mnt/c`. Set a Nerd Font in Windows Terminal, or put `ICONS="unicode"` into
-`~/.config/samebench/local.sh`. The [installation guide](docs/installation.md#wsl-on-windows) explains how to limit
-what WSL processes can reach on the Windows side.
-
-</details>
-
-> [!TIP]
-> Already have Neovim, tmux, uv or Jupyter on that machine? They stay untouched. Run `bin/samebench plan mac` or
-> `bin/samebench plan linux` first to see exactly what would change, and read
-> [machines with an existing setup](docs/installation.md#machines-with-an-existing-setup).
-
-## What works where
-
-|  | macOS | Linux desktop | WSL | Linux over SSH |
-|---|:---:|:---:|:---:|:---:|
-| Layouts, Neovim, lazygit, agent | ✅ | ✅ | ✅ | ✅ |
-| `dev -j` with a shared Jupyter kernel | ✅ | ✅ | ✅ | ✅ |
-| `jlab` opens your browser | ✅ | ✅ | ✅ | prints a clickable link |
-| Python installed by uv when needed | ✅ | ✅ | ✅ | ✅ |
-| TypeScript and Angular editing with the [`web` module](docs/configuration.md#the-web-module) | ✅ | not tested yet | not tested yet | not tested yet |
-| C# editing with the [`dotnet` module](docs/configuration.md#the-dotnet-module) | ✅ | not tested yet | not tested yet | not tested yet |
-| Nerd Font for the icons, set in | your terminal | your terminal | Windows Terminal | your local terminal |
-
-## A day with it
-
-```bash
-cd ~/projects/demo
-dev -j          # editor, terminal and agent, plus Jupyter for this project
-jlab            # open JupyterLab, already logged in
-dev -k          # done for today, stop everything in this session
-```
-
-Inside Neovim, <kbd>Space</kbd> <kbd>j</kbd> <kbd>k</kbd> turns the terminal below into a console attached to the
-notebook's kernel, and <kbd>Space</kbd> <kbd>j</kbd> <kbd>j</kbd> runs the current cell. Open the same notebook in
-the browser and every variable is already there.
-
-<p align="center">
-  <img alt="JupyterLab in the browser and the kernel console below Neovim are attached to one kernel, which runs from the project's .venv" src="docs/assets/kernel.svg" width="100%">
-</p>
-
-The kernel runs from the project's own `.venv`. `dev -j` builds it with `uv sync --frozen`, exactly as the
-project's `uv.lock` says, and asks you once before it installs those packages.
-
-A full-stack project gets one session per repository. `dev` brings the language servers, and you start the
-applications yourself in the terminal pane of each session.
-
-```bash
-dev ~/projects/shop-web     # Angular frontend, then in its terminal pane: npx ng serve
-dev ~/projects/shop-api     # .NET backend, then in its terminal pane: dotnet run
-```
-
-<kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>s</kbd> switches between the two sessions, and both servers keep running.
-
-There is a lot more to it, from the three layouts to the notebook cell bars. The [daily use guide](docs/daily-use.md)
-walks through the layouts and through a day on an
-[Angular](docs/daily-use.md#working-on-a-typescript-or-angular-project) or a
-[.NET](docs/daily-use.md#working-on-a-net-project) project, and the [notebook guide](docs/notebooks.md) covers
-the notebooks.
 
 ## Security in one picture
 
@@ -227,48 +281,47 @@ The full story is in [updates and security](docs/updates-and-security.md).
 
 | Command | What it does |
 |---|---|
-| `dev` | Start or reopen the workspace for the current folder |
+| `dev` · `dev ~/projects/demo` | Start or reopen the workspace for the current folder · for another folder |
 | `dev -j` · `dev -l agent` | Add Jupyter · put the agent on the left |
-| `dev -s` · `dev -k` · `dev -r` | List sessions · stop this one · rebuild it |
+| `dev -s` · `dev -k` · `dev -r` | List sessions · stop this one · rebuild it, for example `dev -r -j` to add Jupyter |
 | `jlab` | Open the running JupyterLab |
 | `samebench plan` · `samebench apply` | Show what would change · set everything up |
 | `samebench update` · `samebench sync` | Monthly update on one machine · bring the others up to date |
 | `samebench check` · `samebench fix` | Look for vulnerabilities · lift one package to its fixed version |
 | `samebench doctor` · `samebench remove` | Check the state of this machine · undo everything |
 
-<details>
-<summary><b>Keys you will use every day</b></summary>
+`dev` runs on its own tmux server, so a plain `tmux ls` doesn't list these sessions. `dev -s` does, and inside a
+session <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>s</kbd> shows the same list. Every key for Neovim, tmux, lazygit,
+notebooks and .NET is on the [cheat sheet](docs/cheatsheet.md).
 
-<br>
+## What works where
 
-| Keys | Action |
-|---|---|
-| <kbd>Space</kbd> | Wait a moment and which-key shows everything |
-| <kbd>Space</kbd> <kbd>Space</kbd> | Find a file |
-| <kbd>Space</kbd> <kbd>e</kbd> | Toggle the file explorer |
-| <kbd>Space</kbd> <kbd>g</kbd> <kbd>g</kbd> | lazygit |
-| <kbd>Ctrl</kbd>+<kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd> | Move between Neovim windows and tmux panes |
-| <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>z</kbd> | Zoom the current pane |
-| <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>d</kbd> | Leave the session, it keeps running |
-| <kbd>Space</kbd> <kbd>H</kbd> | Open the short cheat sheet inside Neovim |
+|  | macOS | Linux desktop | WSL | Linux over SSH |
+|---|:---:|:---:|:---:|:---:|
+| Layouts, Neovim, lazygit, agent | ✅ | ✅ | ✅ | ✅ |
+| `dev -j` with a shared Jupyter kernel | ✅ | ✅ | ✅ | ✅ |
+| `jlab` opens your browser | ✅ | ✅ | ✅ | prints a clickable link |
+| Python installed by uv when needed | ✅ | ✅ | ✅ | ✅ |
+| TypeScript and Angular editing with the [`web` module](docs/configuration.md#the-web-module) | ✅ | not tested yet | not tested yet | not tested yet |
+| C# editing with the [`dotnet` module](docs/configuration.md#the-dotnet-module) | ✅ | not tested yet | not tested yet | not tested yet |
+| Nerd Font for the icons, set in | your terminal | your terminal | Windows Terminal | your local terminal |
 
-The [full cheat sheet](docs/cheatsheet.md) covers Neovim, tmux, lazygit, notebooks and .NET.
+The full setup, both modules included, has been tested on macOS. Linux and WSL have not had a complete run yet,
+so expect rough edges there and please report them. The step that offers the .NET SDK through apt has only been
+run against stand-ins, not on a real Ubuntu or Debian.
 
-</details>
+## When you need more
 
-## Documentation
+Everything for a normal day is on this page. These guides are for the moments that go beyond it.
 
 | Guide | Read it when |
 |---|---|
-| [Installation](docs/installation.md) | You set up a new machine, a VM over SSH or WSL |
-| [Daily use](docs/daily-use.md) | You want to know the layouts, sessions and `jlab`, or work on an Angular or .NET project |
+| [Installation](docs/installation.md) | You set up a VM over SSH or WSL, need the .NET SDK, sit behind a proxy, or want everything removed again |
 | [Notebooks](docs/notebooks.md) | You work with Jupyter notebooks |
-| [Updates and security](docs/updates-and-security.md) | It's update day, or a security warning showed up |
+| [Updates and security](docs/updates-and-security.md) | It's update day, a security warning showed up, or you open a repository you don't know |
 | [Configuration](docs/configuration.md) | You want to change a profile or the look, or turn on the `web` or `dotnet` module |
 | [How it works](docs/architecture.md) | You want to understand or change the scripts |
 | [Cheat sheet](docs/cheatsheet.md) | You forgot a key |
-
-The [documentation index](docs/README.md) lists the same guides and says what has been tested on which system.
 
 <br>
 

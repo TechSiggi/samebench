@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="348" viewBox="0 0 1280 348" role="img" aria-labelledby="t d">
+  <title id="t">Two sessions, one for the backend and one for the frontend</title>
+  <desc id="d">Two dev sessions run side by side. On the left the session shop-api for a .NET backend, with dotnet run in its terminal pane. On the right the session shop-web for an Angular frontend, with npx ng serve in its terminal pane. Each session has its own Neovim and its own agent. Between them, Ctrl+b then s shows the list of both sessions, Ctrl+b then L jumps back to the last one, and Ctrl+b then d leaves tmux while both sessions keep running.</desc>
+  <defs>
+    <style>
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .win { fill: #14162a; stroke: #2a2e45; }
+      .act { fill: #16182a; stroke: #8ff0c8; }
+      .ina { fill: #1c1f33; stroke: #3b4261; }
+      .lbl { font-size: 13px; font-weight: 700; }
+      .sub { font-size: 11px; fill: #6b7089; }
+      .cmd { font-size: 12px; fill: #eef1ff; }
+      .key { fill: #2a2e45; stroke: #3b4261; }
+      .keyt { font-size: 11px; fill: #c8d3f5; }
+      .row { font-size: 12px; }
+      .tube { fill: #14162a; stroke: #2a2e45; }
+      .wire { fill: none; stroke: #8ff0c8; stroke-width: 2; stroke-linecap: round; }
+      .plug { fill: #8ff0c8; stroke: #14162a; stroke-width: 2; }
+      .here { fill: none; stroke: #8ff0c8; stroke-width: 2; }
+    </style>
+    <g id="code-lines">
+      <rect x="0" y="0" width="26" height="6" rx="3" fill="#c3a6ff"/><rect x="30" y="0" width="74" height="6" rx="3" fill="#c8d3f5"/>
+      <rect x="0" y="14" width="20" height="6" rx="3" fill="#8ec5ff"/><rect x="24" y="14" width="110" height="6" rx="3" fill="#c3e88d"/>
+      <rect x="0" y="28" width="60" height="6" rx="3" fill="#c8d3f5"/><rect x="64" y="28" width="36" height="6" rx="3" fill="#ffc27a"/>
+      <rect x="0" y="42" width="150" height="6" rx="3" fill="#6b7089" opacity="0.7"/>
+    </g>
+    <g id="tree" fill="#6b7089">
+      <rect x="0" y="0" width="46" height="5" rx="2"/><rect x="8" y="12" width="52" height="5" rx="2"/><rect x="8" y="24" width="40" height="5" rx="2"/>
+      <rect x="0" y="36" width="34" height="5" rx="2"/><rect x="8" y="48" width="48" height="5" rx="2"/><rect x="8" y="60" width="38" height="5" rx="2"/>
+    </g>
+    <g id="dots"><circle cx="18" cy="16" r="4.5" fill="#ff757f"/><circle cx="34" cy="16" r="4.5" fill="#ffc27a"/><circle cx="50" cy="16" r="4.5" fill="#c3e88d"/></g>
+  </defs>
+
+  <!-- Tubes that carry the two wires across the page background, so they read on a light and a dark page.
+       Drawn first, the windows and the card sit on top of their ends. -->
+  <rect class="tube" x="480" y="63" width="60" height="8"/>
+  <rect class="tube" x="740" y="89" width="60" height="8"/>
+
+  <!-- Left: the backend session, as dev builds the code layout in bin/dev. dotnet run keeps its terminal pane busy. -->
+  <g>
+    <rect class="win" width="490" height="348" rx="14"/>
+    <use href="#dots"/>
+    <text class="mono" x="245" y="21" text-anchor="middle" font-size="13" fill="#8ff0c8" font-weight="700">dev ~/projects/shop-api</text>
+    <rect x="430.5" y="7.5" width="47" height="17" rx="8.5" fill="none" stroke="#8ec5ff" stroke-opacity="0.7"/>
+    <text class="mono" x="454" y="20" text-anchor="middle" font-size="10.5" fill="#8ec5ff">.net</text>
+    <rect class="act" x="12" y="34" width="466" height="178" rx="8"/>
+    <text class="mono lbl" x="26" y="56" fill="#8ff0c8">Neovim</text>
+    <text class="mono sub" x="88" y="56">OrdersController.cs</text>
+    <rect x="26" y="68" width="92" height="130" rx="4" fill="#1e2136"/>
+    <use href="#tree" x="36" y="80"/>
+    <use href="#code-lines" x="134" y="78"/>
+    <use href="#code-lines" x="150" y="140" opacity="0.8"/>
+    <rect class="ina" x="12" y="220" width="229" height="94" rx="8"/>
+    <text class="mono lbl" x="26" y="242" fill="#c8d3f5">terminal</text>
+    <text class="mono cmd" x="26" y="266"><tspan fill="#8ff0c8">❯</tspan> dotnet run</text>
+    <text class="mono sub" x="26" y="286">Now listening on:</text>
+    <text class="mono" x="26" y="302" font-size="11" fill="#8ec5ff">https://localhost:5001</text>
+    <rect class="ina" x="249" y="220" width="229" height="94" rx="8"/>
+    <text class="mono lbl" x="263" y="242" fill="#ffc27a">agent</text>
+    <g><rect x="263" y="258" width="14" height="6" rx="3" fill="#ffc27a"/><rect x="281" y="258" width="110" height="6" rx="3" fill="#c8d3f5" opacity="0.8"/>
+      <rect x="263" y="272" width="150" height="6" rx="3" fill="#6b7089" opacity="0.7"/><rect x="263" y="286" width="96" height="6" rx="3" fill="#6b7089" opacity="0.7"/></g>
+    <g class="mono" font-size="10"><rect x="12" y="324" width="66" height="16" rx="8" fill="#8ff0c8"/><text x="45" y="336" text-anchor="middle" fill="#14162a" font-weight="700">shop-api</text>
+      <text x="88" y="336" fill="#8ff0c8" font-weight="700">1:main</text><text x="134" y="336" fill="#6b7089">2:shell</text>
+      <text x="478" y="336" text-anchor="end" fill="#c3a6ff">⎇ main</text></g>
+    <!-- the mint frame marks the session you are in, it changes sides every four seconds -->
+    <rect class="here" x="1" y="1" width="488" height="346" rx="13">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" calcMode="discrete" values="1;0" keyTimes="0;0.5"/>
+    </rect>
+  </g>
+
+  <!-- Right: the frontend session. npx ng serve keeps its terminal pane busy. -->
+  <g transform="translate(790 0)">
+    <rect class="win" width="490" height="348" rx="14"/>
+    <use href="#dots"/>
+    <text class="mono" x="245" y="21" text-anchor="middle" font-size="13" fill="#8ff0c8" font-weight="700">dev ~/projects/shop-web</text>
+    <rect x="430.5" y="7.5" width="47" height="17" rx="8.5" fill="none" stroke="#ff9ecf" stroke-opacity="0.7"/>
+    <text class="mono" x="454" y="20" text-anchor="middle" font-size="10.5" fill="#ff9ecf">node</text>
+    <rect class="act" x="12" y="34" width="466" height="178" rx="8"/>
+    <text class="mono lbl" x="26" y="56" fill="#8ff0c8">Neovim</text>
+    <text class="mono sub" x="88" y="56">orders.component.ts</text>
+    <rect x="26" y="68" width="92" height="130" rx="4" fill="#1e2136"/>
+    <use href="#tree" x="36" y="80"/>
+    <use href="#code-lines" x="134" y="78"/>
+    <g transform="translate(150 140)">
+      <rect width="34" height="6" rx="3" fill="#ff9ecf"/><rect x="38" width="96" height="6" rx="3" fill="#c8d3f5"/>
+      <rect y="14" width="22" height="6" rx="3" fill="#8ec5ff"/><rect x="26" y="14" width="70" height="6" rx="3" fill="#c3e88d"/>
+      <rect y="28" width="120" height="6" rx="3" fill="#6b7089" opacity="0.7"/>
+    </g>
+    <rect class="ina" x="12" y="220" width="229" height="94" rx="8"/>
+    <text class="mono lbl" x="26" y="242" fill="#c8d3f5">terminal</text>
+    <text class="mono cmd" x="26" y="266"><tspan fill="#8ff0c8">❯</tspan> npx ng serve</text>
+    <text class="mono sub" x="26" y="286">Local:</text>
+    <text class="mono" x="26" y="302" font-size="11" fill="#ff9ecf">http://localhost:4200/</text>
+    <rect class="ina" x="249" y="220" width="229" height="94" rx="8"/>
+    <text class="mono lbl" x="263" y="242" fill="#ffc27a">agent</text>
+    <g><rect x="263" y="258" width="14" height="6" rx="3" fill="#ffc27a"/><rect x="281" y="258" width="130" height="6" rx="3" fill="#c8d3f5" opacity="0.8"/>
+      <rect x="263" y="272" width="110" height="6" rx="3" fill="#6b7089" opacity="0.7"/><rect x="263" y="286" width="140" height="6" rx="3" fill="#6b7089" opacity="0.7"/></g>
+    <g class="mono" font-size="10"><rect x="12" y="324" width="66" height="16" rx="8" fill="#8ff0c8"/><text x="45" y="336" text-anchor="middle" fill="#14162a" font-weight="700">shop-web</text>
+      <text x="88" y="336" fill="#8ff0c8" font-weight="700">1:main</text><text x="134" y="336" fill="#6b7089">2:shell</text>
+      <text x="478" y="336" text-anchor="end" fill="#c3a6ff">⎇ main</text></g>
+    <rect class="here" x="1" y="1" width="488" height="346" rx="13" opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" calcMode="discrete" values="0;1" keyTimes="0;0.5"/>
+    </rect>
+  </g>
+
+  <!-- Middle: the three keys. On top the list that Ctrl+b s shows, one row per session.
+       The highlighted row follows the mint frame. -->
+  <g>
+    <rect class="win" x="530" y="0" width="220" height="160" rx="14"/>
+    <g class="mono">
+      <rect class="key" x="546" y="14" width="58" height="22" rx="5"/>
+      <text class="keyt" x="575" y="29" text-anchor="middle">Ctrl+b</text>
+      <rect class="key" x="610" y="14" width="22" height="22" rx="5"/>
+      <text class="keyt" x="621" y="29" text-anchor="middle">s</text>
+      <text class="sub" x="642" y="29">pick a session</text>
+    </g>
+    <rect class="ina" x="542" y="48" width="196" height="100" rx="8"/>
+    <!-- state one: you are in shop-api -->
+    <g class="mono row">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" calcMode="discrete" values="1;0" keyTimes="0;0.5"/>
+      <rect x="548" y="56" width="184" height="22" rx="4" fill="#8ff0c8"/>
+      <text x="556" y="71" fill="#14162a" font-weight="700">(0) shop-api</text>
+      <text x="556" y="97" fill="#c8d3f5">(1) shop-web</text>
+    </g>
+    <!-- state two: you are in shop-web -->
+    <g class="mono row" opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" calcMode="discrete" values="0;1" keyTimes="0;0.5"/>
+      <rect x="548" y="82" width="184" height="22" rx="4" fill="#8ff0c8"/>
+      <text x="556" y="71" fill="#c8d3f5">(0) shop-api</text>
+      <text x="556" y="97" fill="#14162a" font-weight="700">(1) shop-web</text>
+    </g>
+    <text class="mono sub" x="556" y="134">arrow keys, then Enter</text>
+
+    <rect class="win" x="530" y="176" width="220" height="78" rx="14"/>
+    <g class="mono">
+      <rect class="key" x="546" y="190" width="58" height="22" rx="5"/>
+      <text class="keyt" x="575" y="205" text-anchor="middle">Ctrl+b</text>
+      <rect class="key" x="610" y="190" width="22" height="22" rx="5"/>
+      <text class="keyt" x="621" y="205" text-anchor="middle">L</text>
+      <text class="sub" x="546" y="236">back to the last session</text>
+    </g>
+
+    <rect class="win" x="530" y="270" width="220" height="78" rx="14"/>
+    <g class="mono">
+      <rect class="key" x="546" y="284" width="58" height="22" rx="5"/>
+      <text class="keyt" x="575" y="299" text-anchor="middle">Ctrl+b</text>
+      <rect class="key" x="610" y="284" width="22" height="22" rx="5"/>
+      <text class="keyt" x="621" y="299" text-anchor="middle">d</text>
+      <text class="sub" x="546" y="330">leave, both keep running</text>
+    </g>
+  </g>
+
+  <!-- The two wires, each from a row of the list to its session. -->
+  <path class="wire" d="M490 67 H548"/>
+  <path class="wire" d="M732 93 H790"/>
+  <circle class="plug" cx="490" cy="67" r="5"/>
+  <circle class="plug" cx="790" cy="93" r="5"/>
+</svg>

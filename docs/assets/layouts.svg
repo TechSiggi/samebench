@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="330" viewBox="0 0 1280 330" role="img" aria-labelledby="t d">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="344" viewBox="0 0 1280 344" role="img" aria-labelledby="t d">
   <title id="t">dev layouts</title>
-  <desc id="d">Three tmux layouts started by dev: the default code layout, the agent layout and the code layout with Jupyter.</desc>
+  <desc id="d">Three tmux layouts started by dev. The default code layout has Neovim on top, a terminal bottom left and the agent bottom right. dev -j is the same layout with Jupyter: the terminal becomes a console on the notebook's kernel, and JupyterLab in the browser is attached to the same kernel. dev -l agent puts the agent on the left and Neovim on the right.</desc>
   <defs>
     <style>
       .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
@@ -9,6 +9,9 @@
       .ina { fill: #1c1f33; stroke: #3b4261; }
       .lbl { font-size: 13px; font-weight: 700; }
       .sub { font-size: 11px; fill: #6b7089; }
+      .key { fill: #2a2e45; stroke: #3b4261; }
+      .wire { fill: none; stroke: #8ff0c8; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      .plug { fill: #8ff0c8; stroke: #14162a; stroke-width: 2; }
     </style>
     <g id="code-lines">
       <rect x="0" y="0" width="26" height="6" rx="3" fill="#c3a6ff"/><rect x="30" y="0" width="74" height="6" rx="3" fill="#c8d3f5"/>
@@ -31,7 +34,7 @@
     <use href="#code-lines" x="120" y="74"/>
     <rect class="ina" x="12" y="200" width="184" height="66" rx="8"/>
     <text class="mono lbl" x="26" y="222" fill="#c8d3f5">terminal</text>
-    <text class="mono sub" x="26" y="244">Space jk → kernel</text>
+    <text class="mono sub" x="26" y="244">ng serve, dotnet run</text>
     <rect class="ina" x="204" y="200" width="184" height="66" rx="8"/>
     <text class="mono lbl" x="218" y="222" fill="#ffc27a">agent</text>
     <text class="mono sub" x="218" y="244">Claude, Copilot, …</text>
@@ -39,8 +42,66 @@
       <text x="80" y="288" fill="#8ff0c8" font-weight="700">1:main</text><text x="126" y="288" fill="#6b7089">2:shell</text></g>
   </g>
 
-  <!-- 2: dev -l agent -->
+  <!-- 2: dev -j, the code layout with Jupyter. The terminal pane is a console on the notebook's kernel,
+       and the JupyterLab window that floats over the corner is the browser on the same kernel. -->
   <g transform="translate(440 0)">
+    <rect class="win" width="400" height="300" rx="14"/>
+    <use href="#dots"/>
+    <text class="mono" x="200" y="21" text-anchor="middle" font-size="13" fill="#8ff0c8" font-weight="700">dev -j</text>
+    <rect class="act" x="12" y="34" width="376" height="158" rx="8"/>
+    <text class="mono lbl" x="26" y="56" fill="#8ff0c8">Neovim</text>
+    <text class="mono sub" x="88" y="56">analysis.ipynb</text>
+    <!-- the keys that run the cell -->
+    <g class="mono" font-size="11">
+      <rect class="key" x="288" y="42" width="42" height="20" rx="5"/>
+      <text x="309" y="56" text-anchor="middle" fill="#c8d3f5">Space</text>
+      <rect class="key" x="334" y="42" width="18" height="20" rx="5"/>
+      <text x="343" y="56" text-anchor="middle" fill="#c8d3f5">j</text>
+      <rect class="key" x="356" y="42" width="18" height="20" rx="5"/>
+      <text x="365" y="56" text-anchor="middle" fill="#c8d3f5">j</text>
+    </g>
+    <rect x="26" y="70" width="348" height="12" rx="3" fill="#2a2e45"/>
+    <text class="mono" x="34" y="79" font-size="8" fill="#8ff0c8" font-weight="700">Cell 2 · Code</text>
+    <rect x="104" y="75.5" width="216" height="1" fill="#8ff0c8" opacity="0.6"/>
+    <text class="mono" x="366" y="79" text-anchor="end" font-size="8" fill="#8ff0c8" font-weight="700">✓ 12:03</text>
+    <rect x="26" y="92" width="3" height="48" rx="1.5" fill="#8ff0c8"/>
+    <use href="#code-lines" x="38" y="92"/>
+    <rect x="26" y="150" width="348" height="12" rx="3" fill="#2a2e45"/>
+    <text class="mono" x="34" y="159" font-size="8" fill="#8ff0c8" font-weight="700">Cell 3 · Markdown</text>
+    <rect x="122" y="155.5" width="244" height="1" fill="#8ff0c8" opacity="0.6"/>
+    <rect x="38" y="172" width="190" height="6" rx="3" fill="#c3a6ff" opacity="0.55"/>
+    <rect class="ina" x="12" y="200" width="184" height="66" rx="8"/>
+    <text class="mono lbl" x="26" y="222" fill="#c8d3f5">kernel</text>
+    <text class="mono sub" x="82" y="222">console</text>
+    <!-- The console creates df as input 3. The browser uses it as input 4, because both count on the one kernel. -->
+    <text class="mono" x="26" y="246" font-size="10" fill="#8ff0c8">In [3]: <tspan fill="#ffc27a" font-weight="700">df</tspan><tspan fill="#c8d3f5"> = pd.read_csv(…)</tspan></text>
+    <rect class="ina" x="204" y="200" width="184" height="66" rx="8"/>
+    <text class="mono lbl" x="218" y="222" fill="#ffc27a">agent</text>
+    <g class="mono" font-size="10"><rect x="12" y="276" width="58" height="16" rx="8" fill="#8ff0c8"/><text x="41" y="288" text-anchor="middle" fill="#14162a" font-weight="700">project</text>
+      <text x="80" y="288" fill="#8ff0c8" font-weight="700">1:main</text><text x="126" y="288" fill="#ffc27a">2:jupyter</text><text x="190" y="288" fill="#6b7089">3:shell</text></g>
+
+    <!-- JupyterLab in the browser -->
+    <g transform="translate(240 232)">
+      <rect width="154" height="104" rx="10" fill="#14162a" stroke="#ffc27a" stroke-opacity="0.9"/>
+      <circle cx="12" cy="10" r="3" fill="#ff757f"/><circle cx="22" cy="10" r="3" fill="#ffc27a"/><circle cx="32" cy="10" r="3" fill="#c3e88d"/>
+      <rect x="42" y="4" width="104" height="12" rx="6" fill="#2a2e45"/>
+      <text class="mono" x="94" y="13" text-anchor="middle" font-size="7.5" fill="#6b7089">127.0.0.1:8888/lab</text>
+      <text class="mono" x="10" y="36" font-size="12" font-weight="700" fill="#ffc27a">JupyterLab</text>
+      <text class="mono" x="146" y="36" text-anchor="end" font-size="9.5" fill="#6b7089">browser</text>
+      <rect class="act" x="8" y="46" width="138" height="50" rx="5"/>
+      <text class="mono" x="15" y="61" font-size="9" fill="#8ff0c8">[4]: <tspan fill="#ffc27a" font-weight="700">df</tspan><tspan fill="#c8d3f5">.head()</tspan></text>
+      <g fill="#6b7089"><rect x="15" y="70" width="8" height="4" rx="2"/><rect x="34" y="70" width="28" height="4" rx="2"/><rect x="76" y="70" width="34" height="4" rx="2"/></g>
+      <g fill="#c8d3f5" opacity="0.8"><rect x="34" y="79" width="34" height="4" rx="2"/><rect x="76" y="79" width="20" height="4" rx="2"/>
+        <rect x="34" y="87" width="26" height="4" rx="2"/><rect x="76" y="87" width="24" height="4" rx="2"/></g>
+    </g>
+    <!-- one kernel behind both: the wire from the console to the browser -->
+    <path class="wire" d="M150 266 V271 H240"/>
+    <circle class="plug" cx="150" cy="266" r="4"/>
+    <circle class="plug" cx="240" cy="271" r="4"/>
+  </g>
+
+  <!-- 3: dev -l agent -->
+  <g transform="translate(880 0)">
     <rect class="win" width="400" height="300" rx="14"/>
     <use href="#dots"/>
     <text class="mono" x="200" y="21" text-anchor="middle" font-size="13" fill="#8ff0c8" font-weight="700">dev -l agent</text>
@@ -60,26 +121,4 @@
       <text x="80" y="288" fill="#8ff0c8" font-weight="700">1:main</text><text x="126" y="288" fill="#6b7089">2:shell</text></g>
   </g>
 
-  <!-- 3: dev -j -->
-  <g transform="translate(880 0)">
-    <rect class="win" width="400" height="300" rx="14"/>
-    <use href="#dots"/>
-    <text class="mono" x="200" y="21" text-anchor="middle" font-size="13" fill="#8ff0c8" font-weight="700">dev -j</text>
-    <rect class="act" x="12" y="34" width="376" height="158" rx="8"/>
-    <text class="mono lbl" x="26" y="56" fill="#8ff0c8">Neovim</text>
-    <text class="mono sub" x="88" y="56">notebook as # %% cells</text>
-    <rect x="26" y="66" width="348" height="12" rx="3" fill="#2a2e45"/>
-    <text class="mono" x="34" y="75" font-size="8" fill="#8ff0c8" font-weight="700">Cell 2 · Code ───────────────────────────────────── ✓ 12:03</text>
-    <use href="#code-lines" x="34" y="90"/>
-    <rect x="34" y="148" width="190" height="6" rx="3" fill="#c3a6ff" opacity="0.55"/>
-    <rect x="34" y="162" width="140" height="6" rx="3" fill="#c3a6ff" opacity="0.55"/>
-    <rect class="ina" x="12" y="200" width="184" height="66" rx="8"/>
-    <text class="mono lbl" x="26" y="222" fill="#c8d3f5">kernel</text>
-    <text class="mono" x="26" y="246" font-size="11" fill="#8ff0c8">In [3]: <tspan fill="#c8d3f5">df.head()</tspan></text>
-    <rect class="ina" x="204" y="200" width="184" height="66" rx="8"/>
-    <text class="mono lbl" x="218" y="222" fill="#ffc27a">agent</text>
-    <text class="mono sub" x="218" y="244">same .venv as kernel</text>
-    <g class="mono" font-size="10"><rect x="12" y="276" width="58" height="16" rx="8" fill="#8ff0c8"/><text x="41" y="288" text-anchor="middle" fill="#14162a" font-weight="700">project</text>
-      <text x="80" y="288" fill="#8ff0c8" font-weight="700">1:main</text><text x="126" y="288" fill="#ffc27a">2:jupyter</text><text x="190" y="288" fill="#6b7089">3:shell</text></g>
-  </g>
 </svg>

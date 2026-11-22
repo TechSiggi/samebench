@@ -1,6 +1,24 @@
-# Notebooks
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/head-notebooks-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/head-notebooks-light.svg">
+  <img alt="Notebooks. One kernel behind Neovim and JupyterLab." src="assets/head-notebooks-dark.svg" width="100%">
+</picture>
+
+<br>
+
+**[A typical day](#a-typical-day-with-notebooks)** &nbsp;·&nbsp;
+**[In Neovim](#working-in-neovim)** &nbsp;·&nbsp;
+**[In the browser](#working-in-the-browser)** &nbsp;·&nbsp;
+**[Underneath](#how-it-works-underneath)** &nbsp;·&nbsp;
+**[Python and packages](#python-and-packages)**
 
 [← Back to the overview](../README.md)
+
+</div>
+
+<br>
 
 This setup lets you edit notebooks in Neovim and look at them in JupyterLab at the same time, with **one kernel**
 behind both. Run a cell from the editor and the browser already knows the variable. The repository you work in,
@@ -51,24 +69,24 @@ Open a notebook as usual with <kbd>Space</kbd> <kbd>e</kbd> or <kbd>Space</kbd> 
 cells marked with `# %%` and the task texts as `# %% [markdown]`. Language servers, search and the agent work the
 same as with any other Python file.
 
-| Keys | Action |
-|---|---|
-| <kbd>Space</kbd> <kbd>j</kbd> <kbd>k</kbd> | Turn the terminal below into a console on this notebook's kernel |
-| <kbd>Space</kbd> <kbd>j</kbd> <kbd>j</kbd> | Run the cell, or the selection in visual mode |
-| <kbd>Space</kbd> <kbd>j</kbd> <kbd>n</kbd> | Run the cell and move to the next one |
-| <kbd>Space</kbd> <kbd>j</kbd> <kbd>a</kbd> | Run every cell up to here |
-| <kbd>Space</kbd> <kbd>j</kbd> <kbd>l</kbd> | Run the current line |
-| <kbd>]</kbd> <kbd>j</kbd> · <kbd>[</kbd> <kbd>j</kbd> | Next cell · previous cell |
-| <kbd>Space</kbd> <kbd>j</kbd> <kbd>c</kbd> · <kbd>Space</kbd> <kbd>j</kbd> <kbd>m</kbd> | New code cell · new markdown cell below |
-| <kbd>Space</kbd> <kbd>j</kbd> <kbd>d</kbd> | Compare the notebook with the last commit |
-| `:w` | Save back into the `.ipynb`, outputs are kept |
+<kbd>Space</kbd> <kbd>j</kbd> <kbd>k</kbd> turns the terminal below into a console on this notebook's kernel.
+<kbd>Space</kbd> <kbd>j</kbd> <kbd>j</kbd> runs the cell under the cursor, or the selection in visual mode, and
+<kbd>Space</kbd> <kbd>j</kbd> <kbd>n</kbd> runs it and moves on to the next one. `:w` saves back into the `.ipynb`
+and keeps the outputs. The [cheat sheet](cheatsheet.md#notebooks) lists every notebook key, from moving between
+cells to the diff against the last commit.
 
 Each cell gets a bar like `Cell 3 · Code ──── ✓ 12:03` with the time it last ran, and markdown cells are shown in
 violet italics. That is purely visual, the file itself doesn't change.
 
 ## Working in the browser
 
-`jlab` opens JupyterLab with the same kernel. Two things are worth knowing.
+`jlab` opens JupyterLab with the same kernel. It finds the JupyterLab that belongs to the current folder, prints
+the address with the login token as a clickable link and opens your browser wherever that is possible. Over SSH
+you get the link only, and <kbd>Ctrl</kbd>+click or <kbd>Cmd</kbd>+click opens it locally through the
+[port forwarding](installation.md#linux-vm-over-ssh). Inside a session, <kbd>Ctrl</kbd>+<kbd>b</kbd> then
+<kbd>o</kbd> does the same as typing `jlab`. Your clipboard is never touched.
+
+Two things are worth knowing while you work there.
 
 Code you change in Neovim reaches the browser after **File → Reload Notebook from Disk**. Output of cells you run
 from Neovim shows up in the console, not in the notebook. When you want plots or tables inside the notebook, run

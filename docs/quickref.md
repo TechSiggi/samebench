@@ -27,6 +27,7 @@ Full version with everything: docs/cheatsheet.md
 | `Ctrl h/j/k/l`  | move across Neovim windows and panes    |
 | `Ctrl b` `z`    | zoom pane                               |
 | `Ctrl b` `1-3`  | switch window                           |
+| `Ctrl b` `s/L`  | pick a session / back to the last one   |
 | `Ctrl b` `d`    | leave session, it keeps running         |
 | `Ctrl b` `g`    | lazygit popup                           |
 | `Ctrl b` `o`    | open JupyterLab (same as `jlab`)        |

@@ -1,6 +1,28 @@
-# Installation
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/head-installation-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/head-installation-light.svg">
+  <img alt="Installation. A VM over SSH, WSL, the .NET SDK, proxies and a clean removal." src="assets/head-installation-dark.svg" width="100%">
+</picture>
+
+<br>
+
+**[VM over SSH](#linux-vm-over-ssh)** &nbsp;·&nbsp;
+**[WSL](#wsl-on-windows)** &nbsp;·&nbsp;
+**[.NET SDK](#the-net-sdk)** &nbsp;·&nbsp;
+**[Existing setup](#machines-with-an-existing-setup)** &nbsp;·&nbsp;
+**[Proxy](#behind-a-proxy)** &nbsp;·&nbsp;
+**[Remove](#taking-it-all-away-again)**
 
 [← Back to the overview](../README.md)
+
+</div>
+
+<br>
+
+The three commands that set up a Mac, a Linux machine or WSL are in the [overview](../README.md#install). This page
+covers what goes beyond them.
 
 Every machine gets a **profile**, a small file that sets what differs from the built-in defaults. Two profiles
 ship with the repository, and the [configuration guide](configuration.md#profiles) explains every setting.
@@ -9,9 +31,6 @@ ship with the repository, and the [configuration guide](configuration.md#profile
 |---|---|
 | `mac` | A Mac with Apple silicon |
 | `linux` | Ubuntu or Debian on x64 or arm64, which includes a VM over SSH and WSL |
-
-With both profiles, Python only comes from uv after you confirm, and the Jupyter tool is installed on the first
-`dev -j`.
 
 Before anything is installed, `samebench` shows you a plan with every program, its version, the way it is verified and
 the exact download URL. Nothing happens until you say yes. You can look at that plan on its own at any time. On a
@@ -22,44 +41,20 @@ samebench plan                         # on a machine that is set up
 ~/samebench/bin/samebench plan linux   # on a new machine
 ```
 
-## macOS
-
-1. Install a terminal you like. [Ghostty](https://ghostty.org) is signed and already ships the icons of a Nerd Font.
-2. Install Apple's developer tools, which bring git and a C compiler.
-   ```bash
-   xcode-select --install
-   ```
-3. Clone the repository and run `samebench apply` with the `mac` profile.
-   ```bash
-   git clone https://github.com/TechSiggi/samebench ~/Development/samebench
-   ~/Development/samebench/bin/samebench apply mac
-   ```
-4. Install your coding agent. For Claude Code, use the official installer from Anthropic, read the script first, and
-   turn on `/sandbox` once inside Claude.
-5. Open a new terminal and start your first workspace with `dev ~/path/to/project`.
-
-`samebench apply` loads the profile, checks the system, shows the plan and asks. Only after your yes it downloads the one
-program it fetches itself, the version manager mise. The version and the SHA-256 sums for the supported platforms sit
-at the top of [`bin/samebench`](../bin/samebench). When the download does not match, `samebench` stops and installs nothing.
-Everything else comes through mise and the lockfiles.
-
-## Linux
-
-```bash
-sudo apt-get update && sudo apt-get install -y git curl ca-certificates build-essential unattended-upgrades
-git clone https://github.com/TechSiggi/samebench ~/samebench
-~/samebench/bin/samebench apply linux
-```
-
-Python from apt is not needed. When a project wants Python, uv offers to install a matching version and waits for
-your answer. `unattended-upgrades` keeps the system packages patched with the distribution's signed security
-updates, and `samebench apply` warns when it is missing.
+After your yes, `samebench apply` downloads the one program it fetches itself, the version manager mise. The
+version and the SHA-256 sums for the supported platforms sit at the top of [`bin/samebench`](../bin/samebench).
+When the download does not match, `samebench` stops and installs nothing. Everything else comes through mise and
+the lockfiles. On Linux, `samebench apply` also warns when `unattended-upgrades` is missing.
 
 ## Linux VM over SSH
 
-On the VM itself you follow the Linux steps above. Everything runs there, including Neovim, the agent, `dev -j` and
-JupyterLab. On the computer you sit at, you only run `ssh`, for example from PowerShell in Windows Terminal or from
-the macOS Terminal.
+On the VM itself you follow the [Linux steps](../README.md#install). Everything runs there, including Neovim, the
+agent, `dev -j` and JupyterLab. On the computer you sit at, you only run `ssh`, for example from PowerShell in
+Windows Terminal or from the macOS Terminal.
+
+<p align="center">
+  <img alt="On the left the computer you sit at, where the browser opens 127.0.0.1:8888 for JupyterLab, localhost:4200 for the frontend and localhost:5001 for the backend, and the terminal only runs ssh my-vm. On the right the VM, where everything runs and each server listens on 127.0.0.1. In the middle one SSH connection carries a wire for each LocalForward line of the SSH config, which also says ForwardAgent no. Both ends listen on 127.0.0.1 only, so other devices on the network can't reach these ports" src="assets/tunnel.svg" width="100%">
+</p>
 
 To reach JupyterLab in your local browser, SSH forwards the ports, which is what VS Code does for you
 automatically. Add this once to your SSH config. On Windows it lives in `C:\Users\<you>\.ssh\config`, on a Mac in
@@ -116,8 +111,8 @@ agent included, can request tokens for that cloud. Remove the identity or keep i
 
 ### A frontend development server on the VM
 
-With the [`web` module](configuration.md#the-web-module) you start the development server yourself, in the
-terminal pane of the session on the VM. To open the application in your local browser, forward its port the same
+You start a development server yourself, in the terminal pane of its session on the VM, as the
+[overview](../README.md#frontend-and-backend-side-by-side) shows. To open the application in your local browser, forward its port the same
 way. Angular's server uses port 4200.
 
 ```ssh-config
@@ -137,15 +132,12 @@ listens on when it starts, and by default that is `localhost` only. Add a line w
 
 ## WSL on Windows
 
-Follow the Linux steps inside your WSL distribution. A few things are different from a regular Linux machine.
+Follow the [Linux steps](../README.md#install) inside your WSL distribution and use Windows Terminal. Keep the
+repository and your projects inside the Linux file system, for example in `~/projects`. Under `/mnt/c` everything
+is slow, and file permissions and file watching don't behave properly.
 
-Keep the repository and your projects inside the Linux file system, for example in `~/projects`. Under `/mnt/c`
-everything is slow, and file permissions and file watching don't behave properly.
-
-Use Windows Terminal. For the `nerd` icons, install a Nerd Font on the Windows side and select it there. Otherwise
-put `ICONS="unicode"` into `~/.config/samebench/local.sh` and run `samebench apply` again.
-
-`jlab` opens JupyterLab directly in your Windows browser, because WSL forwards `127.0.0.1` on its own.
+`jlab` opens JupyterLab directly in your Windows browser, because WSL forwards `127.0.0.1` on its own. For the
+`nerd` icons, install a Nerd Font on the Windows side and select it in Windows Terminal.
 
 > [!WARNING]
 > Inside WSL every Linux process, the agent included, can read your Windows drives under `/mnt/c` and start Windows

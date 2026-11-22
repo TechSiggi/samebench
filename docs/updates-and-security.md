@@ -1,6 +1,27 @@
-# Updates and security
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/head-security-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/head-security-light.svg">
+  <img alt="Updates and security. Pinned versions, a question before every install, one update day." src="assets/head-security-dark.svg" width="100%">
+</picture>
+
+<br>
+
+**[What is pinned](#what-is-pinned-where)** &nbsp;·&nbsp;
+**[What asks first](#what-asks-first)** &nbsp;·&nbsp;
+**[Someone else's repository](#opening-someone-elses-repository)** &nbsp;·&nbsp;
+**[Update day](#update-day-once-a-month)** &nbsp;·&nbsp;
+**[Daily check](#the-daily-check)** &nbsp;·&nbsp;
+**[Sync](#syncing)** &nbsp;·&nbsp;
+**[Signed commits](#signed-commits)** &nbsp;·&nbsp;
+**[The agent](#the-coding-agent)**
 
 [← Back to the overview](../README.md)
+
+</div>
+
+<br>
 
 The idea behind this setup is simple. **The repository is the list of approved versions.** No machine picks
 versions on its own. New versions enter the repository in one commit on one machine, and every other machine
@@ -33,19 +54,16 @@ mise is the one program `samebench` downloads itself. It compares the download w
 stops without installing anything when the two differ.
 
 The two .NET tools are the one list without a checksum of its own. `envs/dotnet/tools.txt` pins exact versions,
-and `dotnet tool` fetches them from the feed in your NuGet configuration. Packages on nuget.org carry a signature
-of the repository, and the language server also one of Microsoft. NuGet verifies these signatures by default on
-Linux. On macOS it skips the check by default, so `samebench` turns it on for this one install. The check only
-covers feeds that declare their packages as signed, which nuget.org does and a company feed may not. Take it
-as a safeguard for the public feed and not as a guarantee for every source.
+and `dotnet tool` fetches them from the feed in your NuGet configuration. NuGet verifies the signatures of
+packages from nuget.org, by default on Linux, and on macOS because `samebench` turns the check on for this one
+install. A company feed may not declare its packages as signed, so take the check as a safeguard for the public
+feed and not as a guarantee for every source.
 
 When a lockfile is missing or empty, `samebench apply` stops as well, because installing without it would mean
 taking whatever version is newest. Only the machine with `UPDATER="yes"` goes on and creates a new one.
 
-The plugin list gets the same care. On a new machine LazyVim is fetched at its locked commit before lazy.nvim
-starts, so that one round installs every plugin at its locked commit. lazy.nvim also rewrites `lazy-lock.json`
-whenever it installs something, so `samebench apply` puts the pinned list back if that changed it and stops when a
-plugin is not at its locked commit.
+The plugin list gets the same care. `samebench apply` stops when a plugin is not at its locked commit, and
+[how it works](architecture.md#what-samebench-apply-does) explains how it keeps lazy.nvim from changing the list.
 
 Some things are switched off on purpose.
 
@@ -57,10 +75,9 @@ Some things are switched off on purpose.
   doesn't look for newer versions of itself either, so it only changes through the version pinned in `bin/samebench`.
 - **tmux plugins and `curl | sh` installers** are not used anywhere.
 - **Setting the clipboard from a tmux pane** is blocked, for programs and for text that is merely printed there.
-  A hostile file shown with `cat`, or output from a remote machine, can't fill your clipboard. tmux itself still
-  can, so copy mode works as before, and so does copying from Neovim. Over SSH, `"+y` goes through tmux to the
-  clipboard of the machine you sit at. Pasting from `"+` over SSH asks your terminal for its clipboard, which
-  some terminals confirm or refuse, and the terminal's own paste key is unaffected.
+  A hostile file shown with `cat`, or output from a remote machine, can't fill your clipboard. Copy mode and
+  copying from Neovim work as before, also over SSH, where `"+y` reaches the clipboard of the machine you sit at.
+  Pasting from `"+` over SSH depends on your terminal, which may ask first or refuse.
 - **uv** never downloads Python silently.
 - **npm** installs the web language servers without running any install script and takes no package from a git
   repository. It sends no audit request and doesn't look for a newer npm while it does that.
@@ -71,11 +88,9 @@ Some things are switched off on purpose.
   `roslyn-language-server` the same way. Both tools are pinned and installed by `samebench apply` instead, and
   the plugin does not load while one of them is missing.
 - **The update check of the EasyDotnet server** is skipped. It would ask api.nuget.org about newer versions on
-  every start, whatever feed you configured. The server has no option for that, so Neovim writes the file in
-  which the server keeps the time of its last check, with a time far in the future. This works with the pinned
-  version and is a best effort, since a later version may keep that time somewhere else. On Linux that file
-  lives in `/tmp`, which all users of a machine share, so Neovim only writes it into a folder that belongs to
-  you and that nobody else can write to. Otherwise it leaves the check alone.
+  every start, whatever feed you configured. The server has no option for that, so Neovim sets the time of its
+  last check far into the future. That is a best effort with the pinned version. On Linux Neovim only does it
+  when the folder for that file belongs to you and nobody else can write to it.
 - **JupyterLab** only listens on `127.0.0.1`, needs a token, has no terminal in the browser, and the kernel talks
   over local sockets. Its extension manager can't install anything, and it doesn't fetch news or look for updates.
 - **Format on save** is off, so you never reformat someone else's code by accident.
@@ -127,16 +142,12 @@ run its code yourself, for example a notebook cell, or tell `dev` that you trust
   and C# files get syntax highlighting only.
 - `dev` asks once per project folder whether you trust it, when it builds a session there. A yes is a real
   decision. From then on code from the repository runs with your permissions as soon as you open a file. In a
-  frontend that is the project's TypeScript, its Angular language service, the plugins its `tsconfig.json` names,
-  and ESLint and prettier with their configuration. In a .NET solution it is the build targets, within seconds of
-  opening a C# file, and the test assemblies, which the discovery of the tests loads. Say yes for your own
+  frontend that is everything the restricted mode keeps out. In a .NET solution it is the build targets, within
+  seconds of opening a C# file, and the test assemblies, which the discovery of the tests loads. Say yes for your own
   projects and for repositories in which you would also run `npm ci` or `dotnet build`. A no changes nothing, and
-  the session opens all the same. A yes covers the folder and every folder below it, which is why `dev` never
-  asks in your home folder. The trust stays with that folder. A Neovim that you start in another folder, also
-  from a shell of the trusted session, works without it. A file from another folder that you open inside a
-  trusted Neovim is treated like the trusted ones, so give a repository you don't know its own `dev`.
-  [Trusted project folders](configuration.md#trusted-project-folders) shows the question, where the answers are
-  kept and how to take one back.
+  the session opens all the same.
+  [Trusted project folders](configuration.md#trusted-project-folders) shows the question, how far a yes reaches,
+  where the answers are kept and how to take one back.
 - A `mise.toml` or `.nvmrc` in a project can't bring in another Node version. mise ignores `.nvmrc`. It refuses a
   `mise.toml` from a project folder with an error until you approve that file with `mise trust`, and it only
   installs what the lockfile of this repository names. A project file that asks for another Node version gets
@@ -174,16 +185,11 @@ days, and the delay keeps you out of that window.
 | Web language servers | `npm update` writes only the lockfile and takes versions published at least seven days ago. This step runs on a machine with the `web` module |
 | .NET tools | Nothing changes. The step shows, for each tool in `envs/dotnet/tools.txt`, the pinned version and the newest one on your feed with its publish date. This step runs on a machine with the `dotnet` module |
 
-Plugins have no registry that records a release date, so for them the rule works on commits. lazy.nvim, LazyVim
-and blink.cmp follow release tags, and they move to a new release only once its commit is seven days old. A
-plugin never moves backwards from a commit that is old enough. A commit in the lockfile that is itself younger
-than seven days did not come through this rule, for example because a new LazyVim version brought a plugin along
-and lazy.nvim installed its newest commit. Such a plugin moves back to the newest commit that is seven days old.
-When it has none yet, it stays where it is and the update says so.
-
-Two limits are worth knowing. The age is the date in the commit, which its author sets, so it is a weaker signal
-than the release date a package registry records. And a fetch error, a broken plugin folder or a missing branch
-stops the update and leaves `lazy-lock.json` alone.
+Plugins have no registry that records a release date, so for them the rule works on the date of a commit. Its
+author sets that date, which makes it a weaker signal than the release date of a package registry. A plugin never
+moves backwards from a commit that is old enough, and any error while fetching stops the update and leaves
+`lazy-lock.json` alone. [The seven day rule](architecture.md#the-seven-day-rule) explains how the commit of each
+plugin is chosen.
 
 Look at the diff, try it for a minute with `dev`, then commit and push. In Neovim, `:Lazy` → *Log* shows the new
 commits per plugin. Every other machine follows with `samebench sync`. Major versions such as Neovim 0.12 to 0.13 are
@@ -255,16 +261,9 @@ machine deviates. As soon as the repository contains the fix, `samebench sync` s
 Until then the local fix stays active. Should it no longer fit the lockfiles of a new state, `samebench sync` drops
 it, says so and stops, and the next check offers the fix again.
 
-```mermaid
-sequenceDiagram
-    participant U as Updater (UPDATER=yes)
-    participant R as Repository on GitHub
-    participant O as Every other machine
-    U->>U: samebench update, or dev → high advisory → samebench fix
-    U->>R: commit and push the lockfiles
-    O->>R: the daily check notices the new commits
-    O->>O: samebench sync → show, verify, ask, samebench apply
-```
+<p align="center">
+  <img alt="New versions enter through one machine and travel through the repository to every other machine. On the left the updater, the one machine with UPDATER set to yes, runs samebench update once a month or samebench fix after a high or critical advisory, then commits and pushes the lockfiles. In the middle the repository on GitHub holds the lockfiles as the list of approved versions. On the right every other machine notices the new commit in its daily check, and samebench sync shows the commit, verifies the signature and asks before samebench apply installs exactly what the lockfiles say" src="assets/update-flow.svg" width="100%">
+</p>
 
 ## Syncing
 

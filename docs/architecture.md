@@ -1,6 +1,27 @@
-# How it works
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/head-architecture-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/head-architecture-light.svg">
+  <img alt="How it works. The scripts behind samebench, piece by piece." src="assets/head-architecture-dark.svg" width="100%">
+</picture>
+
+<br>
+
+**[The pieces](#the-pieces)** &nbsp;·&nbsp;
+**[samebench apply](#what-samebench-apply-does)** &nbsp;·&nbsp;
+**[Where things live](#where-things-live-on-a-machine)** &nbsp;·&nbsp;
+**[Project code](#how-dev-decides-about-project-code)** &nbsp;·&nbsp;
+**[Kernel](#the-kernel-trick-behind-dev--j)** &nbsp;·&nbsp;
+**[Seven day rule](#the-seven-day-rule)** &nbsp;·&nbsp;
+**[Daily check](#the-daily-check)** &nbsp;·&nbsp;
+**[Sync](#syncing-safely)**
 
 [← Back to the overview](../README.md)
+
+</div>
+
+<br>
 
 This page is for the moment you want to change something in the scripts themselves. It walks through the pieces,
 then through the few places where the scripts do something that is not obvious from reading them once.
@@ -96,7 +117,7 @@ where the version would come from. The two .NET tools follow after the web langu
 to exactly that version. dotnet keeps each tool in `.store/<id>/<version>` below that folder, and a tool that
 already sits at its pinned version, and at no other, is skipped. The command runs in the home folder, because
 NuGet reads its configuration from the current folder upwards and a project folder could bring a feed of its
-own. It runs without the .NET banner. The first `dotnet` command on a machine also creates the ASP.NET
+own. The first `dotnet` command on a machine also creates the ASP.NET
 development certificate, and `samebench` switches that off for its own calls, so the certificate is created by
 the first `dotnet` command you run yourself. The package id
 and the version only reach the command line when they consist of the characters such names are made of. Without
@@ -135,12 +156,11 @@ Neovim runs with `NVIM_APPNAME=samebench-nvim`, which gives it its own configura
 
 ## How `dev` decides about project code
 
-Some language servers and formatters can load code from the project they work on. With the `web` module that is
-the project's own TypeScript, its Angular language service, tsserver plugins and ESLint and prettier with their
-configuration. `config/nvim/lua/modules/web.lua` only allows it in a trusted folder. Everywhere else the
-restricted mode applies, in which only code from samebench's own folder runs. With the `dotnet` module it is the
-C# language server, which evaluates the MSBuild files of a project and runs build targets from it. There is no
-restricted mode for that, so `config/nvim/lua/modules/dotnet.lua` does not load the plugin at all without trust.
+Some language servers and formatters can load code from the project they work on, and
+[updates and security](updates-and-security.md#opening-someone-elses-repository) lists what that is for each
+module. `config/nvim/lua/modules/web.lua` only allows it in a trusted folder and runs the servers in the
+restricted mode everywhere else. `config/nvim/lua/modules/dotnet.lua` has no restricted mode to fall back on, so
+it does not load the plugin at all without trust.
 
 Both files ask `config/nvim/lua/samebench/trust.lua`, and the rule exists only there. Neovim counts as trusted
 when `SAMEBENCH_TRUSTED` is `1` in its environment and it was started in the folder that `SAMEBENCH_TRUSTED_DIR`

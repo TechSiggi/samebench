@@ -1,9 +1,32 @@
-# Configuration
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/head-configuration-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/head-configuration-light.svg">
+  <img alt="Configuration. Profiles, modules, trusted folders and the look." src="assets/head-configuration-dark.svg" width="100%">
+</picture>
+
+<br>
+
+**[Profiles](#profiles)** &nbsp;·&nbsp;
+**[One machine only](#settings-for-one-machine-only)** &nbsp;·&nbsp;
+**[Modules](#modules)** &nbsp;·&nbsp;
+**[Trusted folders](#trusted-project-folders)** &nbsp;·&nbsp;
+**[The look](#the-look)** &nbsp;·&nbsp;
+**[Editor behaviour](#editor-behaviour-worth-knowing)**
 
 [← Back to the overview](../README.md)
 
+</div>
+
+<br>
+
 Settings live in three places. A profile describes a kind of machine, `local.sh` holds what concerns one machine
 only, and the files under [`config/`](../config) define how the tools look and behave everywhere.
+
+<p align="center">
+  <img alt="A setting is decided in three layers, and the layer read last wins. First the built-in defaults in bin/samebench, then the profile from the repository, which is the same on every machine of that kind, then local.sh outside the repository for this machine only. MODULES goes from core to core python to core python web dotnet. ICONS changes from unicode to nerd in the profile and stays, because local.sh does not set it. samebench doctor shows the values in effect" src="assets/settings.svg" width="100%">
+</p>
 
 ## Profiles
 
