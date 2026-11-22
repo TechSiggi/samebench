@@ -1,0 +1,69 @@
+#!/bin/sh
+# CPU load, used memory and free disk space for the right side of the tmux status bar.
+# Called by tmux every status-interval through #(...). Prints tmux style codes, reads
+# only system counters, writes no files and starts no network access.
+#   macOS: ps, sysctl, vm_stat, df     Linux: /proc/stat, /proc/meminfo, df
+# Muted below the thresholds, orange from 70 % CPU, 80 % memory or under 15 % free
+# disk, red from 90 % CPU, 90 % memory or under 5 % free disk.
+
+export LC_ALL=C
+
+cpu=""
+mem_used=""
+mem_total=""
+
+case "$(uname -s)" in
+Darwin)
+  ncpu=$(sysctl -n hw.ncpu 2>/dev/null)
+  # Sum of the recent CPU share of every process, as a share of all cores
+  cpu=$(ps -A -o %cpu= 2>/dev/null | awk -v n="${ncpu:-1}" '{ s += $1 } END { printf "%d", s / n + 0.5 }')
+  mem_total=$(sysctl -n hw.memsize 2>/dev/null)
+  # Used like in Activity Monitor: app memory (anonymous minus purgeable) + wired + compressed
+  mem_used=$(vm_stat 2>/dev/null | awk '
+    /page size of/            { ps = $8 }
+    /^Anonymous pages/        { a = $3 }
+    /^Pages purgeable/        { p = $3 }
+    /^Pages wired down/       { w = $4 }
+    /^Pages occupied by compressor/ { c = $5 }
+    END { if (ps) printf "%.0f", (a - p + w + c) * ps }')
+  ;;
+Linux)
+  # Share of non-idle time between two readings of /proc/stat, half a second apart
+  read_stat() { awk '/^cpu / { print $2 + $3 + $4 + $5 + $6 + $7 + $8 + $9, $5 + $6 }' /proc/stat 2>/dev/null; }
+  first=$(read_stat)
+  sleep 0.5
+  second=$(read_stat)
+  cpu=$(printf '%s %s\n' "$first" "$second" | awk 'NF == 4 && $3 > $1 { printf "%d", 100 * (1 - ($4 - $2) / ($3 - $1)) + 0.5 }')
+  set -- $(awk '/^MemTotal:/ { t = $2 } /^MemAvailable:/ { a = $2 } END { if (t) printf "%.0f %.0f", (t - a) * 1024, t * 1024 }' /proc/meminfo 2>/dev/null)
+  mem_used=${1:-}
+  mem_total=${2:-}
+  ;;
+esac
+
+# Free and total space of the file system that holds the home folder (POSIX df, KiB)
+set -- $(df -Pk "$HOME" 2>/dev/null | awk 'NR == 2 { print $4, $2 }')
+disk_free=${1:-}
+disk_total=${2:-}
+
+muted="#6b7089"
+orange="#ffc27a"
+red="#ff757f"
+
+out=""
+if [ -n "$cpu" ]; then
+  col=$muted
+  [ "$cpu" -ge 70 ] && col=$orange
+  [ "$cpu" -ge 90 ] && col=$red
+  out="$out#[fg=$col]cpu $cpu%  "
+fi
+if [ -n "$mem_used" ] && [ -n "$mem_total" ]; then
+  out="$out$(awk -v u="$mem_used" -v t="$mem_total" -v m="$muted" -v o="$orange" -v r="$red" 'BEGIN {
+    pct = 100 * u / t; col = (pct >= 90) ? r : (pct >= 80) ? o : m
+    printf "#[fg=%s]mem %.1f/%.0fG  ", col, u / 2^30, t / 2^30 }')"
+fi
+if [ -n "$disk_free" ] && [ -n "$disk_total" ]; then
+  out="$out$(awk -v f="$disk_free" -v t="$disk_total" -v m="$muted" -v o="$orange" -v r="$red" 'BEGIN {
+    pct = 100 * f / t; col = (pct < 5) ? r : (pct < 15) ? o : m
+    printf "#[fg=%s]disk %.0fG free  ", col, f / 2^20 }')"
+fi
+printf '%s' "$out"

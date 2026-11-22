@@ -39,6 +39,7 @@ libexec/ipynb-textconv       notebook diffs for git, falls back to the plain fil
 libexec/samebench-check.lua  vulnerability check against OSV.dev, runs with nvim -l and needs only curl
 libexec/lock-plugins.lua     holds the Neovim plugins to the seven day rule on update day
 libexec/dotnet-tool-news.lua shows on update day what the NuGet feed has for the pinned .NET tools
+libexec/tmux-status          CPU, memory and free disk for the tmux status bar, from system counters only
 profiles/                    mac.sh, linux.sh
 modules/<module>/tools.toml  tools per module, installed by mise
 config/mise-global/          mise settings and mise.lock

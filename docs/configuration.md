@@ -214,8 +214,9 @@ The whole setup shares one visual style, called Liquid Glass, on every machine.
   italic comments, a highlighted current line and rounded borders. A path bar above each code window shows the
   project and the file, with `●` for unsaved changes.
 - **tmux** has a transparent status bar with mint pills. The session pill turns orange while <kbd>Ctrl</kbd>+<kbd>b</kbd>
-  is active. The focused pane is solid and easy to read, the others stay glassy. The git branch of the active pane
-  sits on the right, and every pane title shows the program running in it.
+  is active. The focused pane is solid and easy to read, the others stay glassy. The right side shows the git branch
+  of the active pane, the CPU load, the used memory, the free disk space and the time. The three machine values turn
+  orange and then red when the machine runs short, and every pane title shows the program running in it.
 - **lazygit** gets mint borders with round corners and never checks for updates on its own.
 - **The kernel console** shows its prompts in mint.
 
