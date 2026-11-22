@@ -34,7 +34,7 @@ When the folder has a `.venv`, it is active for the whole session. Neovim's lang
 agent and the terminal all see the project's packages without you activating anything. The one exception is a
 `.venv` that came with the repository itself. `dev` leaves it alone and tells you so.
 
-## Working on a frontend
+## Working on a TypeScript or Angular project
 
 With the [`web` module](configuration.md#the-web-module), `dev` in a TypeScript or Angular project gives you
 completion, go to definition, rename and error hints, in component classes and in templates. Node and npm come
@@ -58,7 +58,7 @@ folder, and switch between them with <kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>s</k
 running in their sessions. On a VM over SSH, the [installation guide](installation.md#a-frontend-development-server-on-the-vm)
 shows how to reach the server from your local browser.
 
-## Working on a backend
+## Working on a .NET project
 
 With the [`dotnet` module](configuration.md#the-dotnet-module), `dev` in a .NET project gives you C# with
 completion, go to definition, rename, quick fixes and diagnostics for the whole solution. The `dotnet` command

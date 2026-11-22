@@ -8,7 +8,7 @@ and the other guides are there for the moment you need them.
 | Guide | What you find there |
 |---|---|
 | [Installation](installation.md) | Mac, Linux, a VM over SSH, WSL, the .NET SDK, proxies, machines that already have a setup, and how to remove everything |
-| [Daily use](daily-use.md) | Layouts, frontend and backend work, sessions, `jlab` and the daily check |
+| [Daily use](daily-use.md) | Layouts, Angular and .NET projects, sessions, `jlab` and the daily check |
 | [Notebooks](notebooks.md) | Working with Jupyter notebooks, the shared kernel, Python and packages |
 | [Updates and security](updates-and-security.md) | What is pinned where, what asks first, opening other people's repositories, update day, vulnerability checks, fixes, sync and signed commits |
 | [Configuration](configuration.md) | Profiles and their defaults, `local.sh`, modules, trusted project folders and the look |

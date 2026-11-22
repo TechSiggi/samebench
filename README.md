@@ -11,6 +11,7 @@
 **[Install](docs/installation.md)** &nbsp;·&nbsp;
 **[Daily use](docs/daily-use.md)** &nbsp;·&nbsp;
 **[Notebooks](docs/notebooks.md)** &nbsp;·&nbsp;
+**[Modules](#modules)** &nbsp;·&nbsp;
 **[Security](docs/updates-and-security.md)** &nbsp;·&nbsp;
 **[Cheat sheet](docs/cheatsheet.md)**
 
@@ -67,6 +68,32 @@ Neovim and tmux run in their own folders and their own server, so an existing se
 </td>
 </tr>
 </table>
+
+## Modules
+
+Neovim, tmux, lazygit and the agent are the same on every machine. Support for a language comes as a module, and
+each machine only gets the modules you list for it.
+
+| Module | For | What you get | Turned on |
+|---|---|---|---|
+| `core` | Every project | Neovim with LazyVim, tmux, lazygit and the pane for your agent | On every machine |
+| `python` | Python and Jupyter notebooks | uv, ruff and ty, and `dev -j` with a kernel shared between editor and browser | In both profiles |
+| [`web`](docs/configuration.md#the-web-module) | TypeScript and Angular | Node.js and the language servers for TypeScript, Angular, HTML, SCSS and ESLint | When you add it |
+| [`dotnet`](docs/configuration.md#the-dotnet-module) | C# and .NET | C# editing with the Roslyn language server and keys to build, run and test. The .NET SDK comes from your system | When you add it |
+
+To add a module, list it in `local.sh` and run `samebench apply` again. It shows what the module would install
+and waits for your yes.
+
+```bash
+# ~/.config/samebench/local.sh
+MODULES="core python web dotnet"
+```
+
+A module brings the runtime and the editing support, and never a project's own dependencies. Angular and its
+CLI come from each project's `package.json`, and NuGet packages from the project as well.
+
+Your daily commands stay the same with every module. A plain `dev` in an Angular or a .NET project starts the
+right language servers, and the first time it asks whether you trust the folder.
 
 ## Quick start
 
@@ -153,8 +180,21 @@ the browser and every variable is already there.
 The kernel runs from the project's own `.venv`. `dev -j` builds it with `uv sync --frozen`, exactly as the
 project's `uv.lock` says, and asks you once before it installs those packages.
 
+A full-stack project gets one session per repository. `dev` brings the language servers, and you start the
+applications yourself in the terminal pane of each session.
+
+```bash
+dev ~/projects/shop-web     # Angular frontend, then in its terminal pane: npx ng serve
+dev ~/projects/shop-api     # .NET backend, then in its terminal pane: dotnet run
+```
+
+<kbd>Ctrl</kbd>+<kbd>b</kbd> then <kbd>s</kbd> switches between the two sessions, and both servers keep running.
+
 There is a lot more to it, from the three layouts to the notebook cell bars. The [daily use guide](docs/daily-use.md)
-and the [notebook guide](docs/notebooks.md) walk through all of it.
+walks through the layouts and through a day on an
+[Angular](docs/daily-use.md#working-on-a-typescript-or-angular-project) or a
+[.NET](docs/daily-use.md#working-on-a-net-project) project, and the [notebook guide](docs/notebooks.md) covers
+the notebooks.
 
 ## Security in one picture
 
@@ -221,10 +261,10 @@ The [full cheat sheet](docs/cheatsheet.md) covers Neovim, tmux, lazygit, noteboo
 | Guide | Read it when |
 |---|---|
 | [Installation](docs/installation.md) | You set up a new machine, a VM over SSH or WSL |
-| [Daily use](docs/daily-use.md) | You want to know the layouts, sessions and `jlab` |
+| [Daily use](docs/daily-use.md) | You want to know the layouts, sessions and `jlab`, or work on an Angular or .NET project |
 | [Notebooks](docs/notebooks.md) | You work with Jupyter notebooks |
 | [Updates and security](docs/updates-and-security.md) | It's update day, or a security warning showed up |
-| [Configuration](docs/configuration.md) | You want to change a profile, the look or add a module |
+| [Configuration](docs/configuration.md) | You want to change a profile or the look, or turn on the `web` or `dotnet` module |
 | [How it works](docs/architecture.md) | You want to understand or change the scripts |
 | [Cheat sheet](docs/cheatsheet.md) | You forgot a key |
 

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-labelledby="t d">
   <title id="t">samebench</title>
-  <desc id="d">The same workbench on every machine, one secure terminal workspace for Mac, Linux and WSL with Neovim, tmux, lazygit and Jupyter in one layout.</desc>
+  <desc id="d">The same workbench on every machine, one secure terminal workspace for Mac, Linux and WSL with Neovim, tmux and lazygit in one layout, and modules for Jupyter, Node.js and .NET.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#f7f8fd"/>
@@ -58,8 +58,14 @@
       <text x="216" y="281" text-anchor="middle" fill="#1f9e6e">tmux</text>
       <rect x="262" y="262" width="88" height="28" rx="14" fill="#ffffff"/>
       <text x="306" y="281" text-anchor="middle" fill="#7a52d1">lazygit</text>
-      <rect x="360" y="262" width="88" height="28" rx="14" fill="#ffffff"/>
-      <text x="404" y="281" text-anchor="middle" fill="#c27413">jupyter</text>
+      <!-- Left of the line is what every machine gets, right of it the modules, drawn as outlines. -->
+      <line x1="364" y1="266" x2="364" y2="286" stroke="#4a5170" stroke-opacity="0.5"/>
+      <rect x="378.5" y="262.5" width="87" height="27" rx="13.5" fill="none" stroke="#c27413" stroke-opacity="0.7"/>
+      <text x="422" y="281" text-anchor="middle" fill="#c27413">jupyter</text>
+      <rect x="476.5" y="262.5" width="71" height="27" rx="13.5" fill="none" stroke="#c0397a" stroke-opacity="0.7"/>
+      <text x="512" y="281" text-anchor="middle" fill="#c0397a">node</text>
+      <rect x="558.5" y="262.5" width="71" height="27" rx="13.5" fill="none" stroke="#2f6fc4" stroke-opacity="0.7"/>
+      <text x="594" y="281" text-anchor="middle" fill="#2f6fc4">.net</text>
     </g>
 
     <!-- Terminal window made of glass -->

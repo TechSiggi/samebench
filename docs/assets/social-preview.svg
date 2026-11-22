@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="t d">
   <title id="t">samebench</title>
-  <desc id="d">The same workbench on every machine, one secure terminal workspace for Mac, Linux and WSL with Neovim, tmux, lazygit and Jupyter in one layout.</desc>
+  <desc id="d">The same workbench on every machine, one secure terminal workspace for Mac, Linux and WSL with Neovim, tmux and lazygit in one layout, and modules for Jupyter, Node.js and .NET.</desc>
   <!-- The picture for link previews, 1280 by 640. It is built from the parts of banner-dark.svg and has no animation.
        Everything that matters stays 80 px away from every edge, because previews get cropped. -->
   <defs>
@@ -62,15 +62,21 @@
   <text x="210" y="268" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="80" font-weight="700" fill="#eef1ff" letter-spacing="-2">samebench</text>
   <text x="88" y="342" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="30" font-weight="600" fill="#eef1ff">The same workbench on every machine.</text>
   <text x="88" y="380" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="22" fill="#a9b1d6">One secure terminal workspace for Mac, Linux and WSL.</text>
-  <g transform="translate(88 410) scale(1.1)" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15">
+  <g transform="translate(88 412)" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15">
     <rect x="0" y="0" width="96" height="28" rx="14" fill="#8ff0c8"/>
     <text x="48" y="19" text-anchor="middle" fill="#14162a" font-weight="700">neovim</text>
     <rect x="106" y="0" width="72" height="28" rx="14" fill="#2a2e45"/>
     <text x="142" y="19" text-anchor="middle" fill="#8ff0c8">tmux</text>
     <rect x="188" y="0" width="88" height="28" rx="14" fill="#2a2e45"/>
     <text x="232" y="19" text-anchor="middle" fill="#c3a6ff">lazygit</text>
-    <rect x="286" y="0" width="88" height="28" rx="14" fill="#2a2e45"/>
-    <text x="330" y="19" text-anchor="middle" fill="#ffc27a">jupyter</text>
+    <!-- Left of the line is what every machine gets, right of it the modules, drawn as outlines. -->
+    <line x1="290" y1="4" x2="290" y2="24" stroke="#6b7089" stroke-opacity="0.7"/>
+    <rect x="304.5" y="0.5" width="87" height="27" rx="13.5" fill="none" stroke="#ffc27a" stroke-opacity="0.7"/>
+    <text x="348" y="19" text-anchor="middle" fill="#ffc27a">jupyter</text>
+    <rect x="402.5" y="0.5" width="71" height="27" rx="13.5" fill="none" stroke="#ff9ecf" stroke-opacity="0.7"/>
+    <text x="438" y="19" text-anchor="middle" fill="#ff9ecf">node</text>
+    <rect x="484.5" y="0.5" width="71" height="27" rx="13.5" fill="none" stroke="#8ec5ff" stroke-opacity="0.7"/>
+    <text x="520" y="19" text-anchor="middle" fill="#8ec5ff">.net</text>
   </g>
 
   <!-- The same window three times, one per machine. The two in the back show only what the next one leaves free. -->
