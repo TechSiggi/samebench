@@ -249,10 +249,15 @@ if [ -n "$jupyter" ]; then
 fi
 
 # Agent command (from the profile). If it is missing, the pane shows a hint and a shell.
+# AGENT_CMD may carry arguments (for example "claude --continue"), so only its first word is checked.
 agent_cmd="${SAMEBENCH_AGENT_CMD:-}"
 agent_hint=""
-if [ -n "$agent_cmd" ] && ! command -v "$agent_cmd" >/dev/null 2>&1; then
-  agent_hint="Agent \"$agent_cmd\" is not installed (see the docs)."
+agent_bin=""
+read -r agent_bin _ <<<"$agent_cmd" || true
+if [ -z "$agent_bin" ]; then
+  agent_cmd=""
+elif ! command -v "$agent_bin" >/dev/null 2>&1; then
+  agent_hint="Agent \"$agent_bin\" is not installed (see the docs)."
   agent_cmd=""
 fi
 

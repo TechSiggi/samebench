@@ -1436,8 +1436,10 @@ cmd_doctor() {
   [ -s "$STATE_DIR/local-patches" ] && warn "Deviates locally (security patches not in the repository yet): $(tr '\n' ' ' <"$STATE_DIR/local-patches")"
   echo
   eval "$(cd "$HOME" && mise env -s bash 2>/dev/null)" || true
-  local t ver have client
-  for t in mise nvim tmux lazygit rg fd tree-sitter uv ruff ty $(has_module web && echo "node npm") git "$AGENT_CMD"; do
+  local t ver have client agent_bin=""
+  # Only the program of AGENT_CMD, without its arguments
+  read -r agent_bin _ <<<"$AGENT_CMD" || true
+  for t in mise nvim tmux lazygit rg fd tree-sitter uv ruff ty $(has_module web && echo "node npm") git "$agent_bin"; do
     [ -n "$t" ] || continue
     if command -v "$t" >/dev/null 2>&1; then ok "$(printf '%-12s' "$t") $(command -v "$t")"
     else warn "$(printf '%-12s' "$t") missing"; fi

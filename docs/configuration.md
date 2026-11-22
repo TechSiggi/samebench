@@ -21,7 +21,7 @@ with the repository set the same three, `MODULES="core python"`, `AGENT_CMD="cla
 |---|---|---|---|
 | `MODULES` | `"core"` | names from `modules/` | Which modules are installed |
 | `LAYOUT` | `code` | `code` · `agent` | The layout `dev` opens without `-l` |
-| `AGENT_CMD` | empty | `claude`, `copilot`, … | The coding agent started in the layout. Without one, that pane is a plain shell |
+| `AGENT_CMD` | empty | `claude`, `copilot`, `"claude --continue"`, … | The coding agent started in the layout, with arguments if you need them. Without one, that pane is a plain shell |
 | `UV_PYTHON_DOWNLOADS` | `manual` | `manual` · `automatic` | `manual` means uv only installs Python after you confirm |
 | `JUPYTER` | `ondemand` | `ondemand` · `yes` · `no` | Install the Jupyter tool on the first `dev -j`, right away, or never |
 | `ICONS` | `unicode` | `nerd` · `unicode` | Real icons and round pills, or plain characters that work everywhere |
