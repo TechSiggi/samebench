@@ -168,7 +168,10 @@ the line in the shell startup files and the tmux configuration name that path. T
 well. The link for Neovim follows `XDG_CONFIG_HOME`, as Neovim does.
 
 Neovim runs with `NVIM_APPNAME=samebench-nvim`, which gives it its own configuration, data and cache folders. tmux runs as
-`tmux -L samebench -f config/tmux/tmux.conf`, a separate server that never reads `~/.tmux.conf`.
+`tmux -L samebench -f config/tmux/tmux.conf`, a separate server that never reads `~/.tmux.conf`. Its panes start an
+interactive shell instead of a login shell, so `~/.profile` and `~/.zprofile` are not read there. A `cd` in one of
+those files would otherwise move every pane away from the project folder. The environment comes from `dev`, and the
+line for samebench sits in `~/.bashrc` or `~/.zshrc`, which every interactive shell reads.
 
 ## How `dev` decides about project code
 

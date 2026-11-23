@@ -286,9 +286,10 @@ run() { # run <pane> <command>: start a command in the pane's shell
   return 0
 }
 title() { tmux select-pane -t "$1" -T "$2"; }
-# hint <pane> <text>: show a hint, then a normal shell (without typed commands)
+# hint <pane> <text>: show a hint, then a normal shell (without typed commands).
+# Not a login shell, like every other pane (see default-command in tmux.conf).
 hint() {
-  tmux respawn-pane -k -t "$1" -c "$dir" "printf '\\n  %s\\n\\n' $(printf '%q' "$2"); exec $(printf '%q' "${SHELL:-/bin/zsh}") -l"
+  tmux respawn-pane -k -t "$1" -c "$dir" "printf '\\n  %s\\n\\n' $(printf '%q' "$2"); exec $(printf '%q' "${SHELL:-/bin/zsh}")"
 }
 start_agent() { if [ -n "$agent_hint" ]; then hint "$1" "$agent_hint"; else run "$1" "$agent_cmd"; fi; }
 
