@@ -6,11 +6,21 @@ local map = vim.keymap.set
 
 -- Ctrl+h/j/k/l: move between Neovim windows AND tmux panes.
 -- At the edge of Neovim it continues seamlessly into the next tmux pane (agent, console).
-local function navigate(wincmd, tmux_dir)
+local function navigate(dir, tmux_dir)
   return function()
-    local before = vim.api.nvim_get_current_win()
-    vim.cmd.wincmd(wincmd)
-    if vim.api.nvim_get_current_win() == before and vim.env.TMUX then
+    -- The explorer is drawn as floating windows on top of a normal split. Look for the
+    -- neighbour of that split, from a float Neovim would jump to the window used last.
+    local win = vim.api.nvim_get_current_win()
+    local float = vim.api.nvim_win_get_config(win)
+    if float.relative == "win" and float.win then
+      win = float.win
+    end
+    local next = vim.api.nvim_win_call(win, function()
+      return vim.fn.win_getid(vim.fn.winnr(dir))
+    end)
+    if next ~= win then
+      vim.api.nvim_set_current_win(next)
+    elseif vim.env.TMUX then
       vim.system({ "tmux", "select-pane", "-" .. tmux_dir })
     end
   end
